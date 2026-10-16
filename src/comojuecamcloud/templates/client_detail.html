@@ -22,23 +22,62 @@
 
 <h2>Giroscopio</h2>
 <div class="card" id="gyro-widget">
-    <div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap;">
-        <div style="flex:1;min-width:250px;">
-            <div id="gyro-canvas"></div>
+    <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;">
+            <svg id="compass-svg" width="180" height="180" viewBox="0 0 200 200">
+                <circle cx="100" cy="100" r="90" fill="var(--surface-hover)" stroke="var(--border)" stroke-width="2"/>
+                <text x="100" y="22" text-anchor="middle" fill="#f38ba8" font-size="14" font-weight="700" font-family="inherit">N</text>
+                <text x="178" y="105" text-anchor="middle" fill="var(--fg)" font-size="14" font-weight="700" font-family="inherit">E</text>
+                <text x="100" y="188" text-anchor="middle" fill="var(--fg)" font-size="14" font-weight="700" font-family="inherit">S</text>
+                <text x="22" y="105" text-anchor="middle" fill="var(--fg)" font-size="14" font-weight="700" font-family="inherit">W</text>
+                <g id="compass-needle">
+                    <line x1="100" y1="40" x2="100" y2="160" stroke="var(--accent)" stroke-width="3"/>
+                    <polygon points="100,35 95,50 105,50" fill="#f38ba8"/>
+                    <circle cx="100" cy="100" r="5" fill="var(--accent)"/>
+                </g>
+            </svg>
+            <div style="margin-top:0.5rem;font-size:0.85rem;color:var(--fg-muted);">
+                Heading: <span id="compass-heading" style="color:var(--accent);font-weight:700;">—</span>
+            </div>
         </div>
-        <div style="min-width:150px;">
-            <div class="meta-row">
-                <span class="meta-label" style="color:#ff5555;">Roll</span>
-                <span class="meta-value" id="gyro-x">—</span>
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;">
+            <svg id="horizon" width="180" height="180" viewBox="0 0 200 200">
+                <defs>
+                    <clipPath id="circle-clip">
+                        <circle cx="100" cy="100" r="90"/>
+                    </clipPath>
+                </defs>
+                <g clip-path="url(#circle-clip)">
+                    <rect id="horizon-sky" x="0" width="200" height="100" y="0" fill="#3b4261"/>
+                    <rect id="horizon-ground" x="0" width="200" height="100" y="100" fill="#8b6f47"/>
+                    <line id="horizon-line" x1="0" y1="100" x2="200" y2="100" stroke="#ffffff" stroke-width="2"/>
+                </g>
+                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--border)" stroke-width="2"/>
+                <line x1="60" y1="100" x2="90" y2="100" stroke="var(--accent)" stroke-width="2"/>
+                <line x1="110" y1="100" x2="140" y2="100" stroke="var(--accent)" stroke-width="2"/>
+                <circle cx="100" cy="100" r="3" fill="var(--accent)"/>
+            </svg>
+            <div style="margin-top:0.5rem;font-size:0.85rem;color:var(--fg-muted);">
+                Inclinacion: <span id="pitch-deg" style="color:var(--accent);font-weight:700;">—</span>
             </div>
-            <div class="meta-row">
-                <span class="meta-label" style="color:#55ff55;">Pitch</span>
-                <span class="meta-value" id="gyro-y">—</span>
-            </div>
-            <div class="meta-row">
-                <span class="meta-label" style="color:#5555ff;">Yaw</span>
-                <span class="meta-value" id="gyro-z">—</span>
-            </div>
+        </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;margin-top:1.5rem;">
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label" style="color:#ff5555;">Roll</span>
+            <span class="meta-value" id="gyro-x" style="font-size:1.1rem;">—</span>
+        </div>
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label" style="color:#55ff55;">Pitch</span>
+            <span class="meta-value" id="gyro-y" style="font-size:1.1rem;">—</span>
+        </div>
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label" style="color:#5555ff;">Yaw</span>
+            <span class="meta-value" id="gyro-z" style="font-size:1.1rem;">—</span>
+        </div>
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label">Heading</span>
+            <span class="meta-value" id="heading-deg" style="font-size:1.1rem;">—</span>
         </div>
     </div>
 </div>
@@ -228,78 +267,6 @@
         return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
     }
 
-    let scene, camera, renderer, bus;
-
-    function initThreeJS() {
-        const container = document.getElementById('gyro-canvas');
-        const width = container.clientWidth;
-        const height = 250;
-
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x2f3347);
-
-        camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-        camera.position.set(3, 2, 4);
-        camera.lookAt(0, 0, 0);
-
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(width, height);
-        container.appendChild(renderer.domElement);
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 10, 7);
-        scene.add(directionalLight);
-
-        bus = new THREE.Group();
-
-        const bodyGeometry = new THREE.BoxGeometry(3, 1.2, 1.5);
-        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x89b4fa });
-        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.y = 0.6;
-        bus.add(body);
-
-        const windowGeometry = new THREE.BoxGeometry(2.8, 0.6, 1.4);
-        const windowMaterial = new THREE.MeshPhongMaterial({ color: 0x7aa2f7, opacity: 0.7, transparent: true });
-        const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
-        windowMesh.position.y = 1.5;
-        bus.add(windowMesh);
-
-        const wheelGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 16);
-        const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x6c7086 });
-
-        const wheel1 = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheel1.rotation.z = Math.PI / 2;
-        wheel1.position.set(-1, 0.1, 0.75);
-        bus.add(wheel1);
-
-        const wheel2 = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheel2.rotation.z = Math.PI / 2;
-        wheel2.position.set(1, 0.1, 0.75);
-        bus.add(wheel2);
-
-        const wheel3 = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheel3.rotation.z = Math.PI / 2;
-        wheel3.position.set(-1, 0.1, -0.75);
-        bus.add(wheel3);
-
-        const wheel4 = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheel4.rotation.z = Math.PI / 2;
-        wheel4.position.set(1, 0.1, -0.75);
-        bus.add(wheel4);
-
-        scene.add(bus);
-
-        animate();
-    }
-
-    function animate() {
-        requestAnimationFrame(animate);
-        renderer.render(scene, camera);
-    }
-
     function updateGyro(orientation) {
         const rollDeg = (orientation.roll * 180 / Math.PI);
         const pitchDeg = (orientation.pitch * 180 / Math.PI);
@@ -309,10 +276,39 @@
         document.getElementById('gyro-y').textContent = pitchDeg.toFixed(1) + '\u00B0';
         document.getElementById('gyro-z').textContent = yawDeg.toFixed(1) + '\u00B0';
 
-        if (bus) {
-            bus.rotation.x = orientation.roll;
-            bus.rotation.y = orientation.pitch;
-            bus.rotation.z = orientation.yaw;
+        let heading = ((-yawDeg % 360) + 360) % 360;
+        const cardinal = heading < 22.5 || heading >= 337.5 ? 'N' :
+                         heading < 67.5 ? 'NE' :
+                         heading < 112.5 ? 'E' :
+                         heading < 157.5 ? 'SE' :
+                         heading < 202.5 ? 'S' :
+                         heading < 247.5 ? 'SW' :
+                         heading < 292.5 ? 'W' : 'NW';
+        document.getElementById('heading-deg').textContent = heading.toFixed(0) + '\u00B0 ' + cardinal;
+        document.getElementById('compass-heading').textContent = heading.toFixed(0) + '\u00B0 ' + cardinal;
+
+        const needle = document.getElementById('compass-needle');
+        if (needle) {
+            needle.setAttribute('transform', 'rotate(' + heading + ', 100, 100)');
+        }
+
+        const pitchAdjusted = 90 - rollDeg;
+        document.getElementById('pitch-deg').textContent = pitchAdjusted.toFixed(1) + '\u00B0';
+
+        const maxOffset = 60;
+        const maxAngle = 45;
+        const clampedPitch = Math.max(-maxAngle, Math.min(maxAngle, pitchAdjusted));
+        const offset = (clampedPitch / maxAngle) * maxOffset;
+
+        const sky = document.getElementById('horizon-sky');
+        const ground = document.getElementById('horizon-ground');
+        const horizonLine = document.getElementById('horizon-line');
+
+        if (sky && ground && horizonLine) {
+            sky.setAttribute('y', -offset);
+            ground.setAttribute('y', 100 - offset);
+            horizonLine.setAttribute('y1', 100 - offset);
+            horizonLine.setAttribute('y2', 100 - offset);
         }
     }
 
@@ -432,8 +428,6 @@
 
         svg.innerHTML = svgContent;
     }
-
-    initThreeJS();
 
     if (processedData.length > 0) {
         const last = processedData[processedData.length - 1];
