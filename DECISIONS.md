@@ -75,12 +75,12 @@
 - `gps`: {latitude, longitude}
 
 ### Gestión de clientes (feature/client-management)
-- **Actividad por tiempo**: cliente activo si recibió datos en últimos 5 minutos
+- **Actividad por tiempo**: cliente activo si recibió datos en últimos 1.5 minutos
 - Campo calculado `is_recently_active` basado en `last_seen` (no en conexión WebSocket)
 - Endpoint `DELETE /clients/{token}` para eliminar clientes
 - Botón eliminar en UI con confirmación
 - WebSocket notifica `client_deleted` para actualización en tiempo real
-- Umbral configurable: `ACTIVE_THRESHOLD_MINUTES = 5`
+- Umbral configurable: `ACTIVE_THRESHOLD_MINUTES = 1.5`
 
 ### Correcciones de flujo
 - Commits de UI hechos inicialmente en main directamente (incorrecto)

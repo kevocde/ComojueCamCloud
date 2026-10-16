@@ -10,7 +10,7 @@ from comojuecamcloud.models.client import Client
 
 class ClientService:
     TOKEN_PATTERN = re.compile(r"^[a-zA-Z0-9]{3}-[a-zA-Z0-9]{3}$")
-    ACTIVE_THRESHOLD_MINUTES = 5
+    ACTIVE_THRESHOLD_MINUTES = 1.5
 
     def __init__(self, db: AsyncSession):
         self.db = db

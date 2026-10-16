@@ -57,7 +57,7 @@ async def test_get_all_clients_with_time_based_active(db):
     await service.get_or_create("ghi-rst")
 
     client = await service.get_client("def-uvw")
-    client.last_seen = datetime.utcnow() - timedelta(minutes=10)
+    client.last_seen = datetime.utcnow() - timedelta(minutes=2)
     await db.commit()
 
     clients = await service.get_all_clients()
