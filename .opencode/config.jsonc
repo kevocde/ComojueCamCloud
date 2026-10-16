@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "name": "ComojueCamCloud",
+  "description": "Optional Python server for ComojueCam Android application",
+  "version": "0.1.0",
+  "instructions": "See AGENTS.md for complete development guidelines",
+  "tools": {
+    "bash": {
+      "allow": [
+        "uv sync",
+        "uv run*",
+        "uv add*",
+        "uv remove*",
+        "uv lock",
+        "python*",
+        "pytest*",
+        "git*"
+      ]
+    },
+    "write": {
+      "allow": ["src/**", "pyproject.toml", "README.md"]
+    },
+    "edit": {
+      "allow": ["src/**", "pyproject.toml", "README.md"]
+    }
+  },
+  "workflow": {
+    "branch": "main",
+    "commit": {
+      "maxLines": 200,
+      "maxFiles": 10
+    },
+    "merge": "pull-request"
+  }
+}
