@@ -10,7 +10,7 @@ from comojuecamcloud.services.telemetry_service import TelemetryService
 async def test_list_clients_empty(client: AsyncClient):
     response = await client.get("/clients")
     assert response.status_code == 200
-    assert "No hay clientes activos" in response.text
+    assert "Sin clientes activos" in response.text
 
 
 @pytest.mark.asyncio
