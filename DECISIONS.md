@@ -74,6 +74,14 @@
 - `magnetometer`: {x, y, z} — campo magnético (µT)
 - `gps`: {latitude, longitude}
 
+### Gestión de clientes (feature/client-management)
+- **Actividad por tiempo**: cliente activo si recibió datos en últimos 5 minutos
+- Campo calculado `is_recently_active` basado en `last_seen` (no en conexión WebSocket)
+- Endpoint `DELETE /clients/{token}` para eliminar clientes
+- Botón eliminar en UI con confirmación
+- WebSocket notifica `client_deleted` para actualización en tiempo real
+- Umbral configurable: `ACTIVE_THRESHOLD_MINUTES = 5`
+
 ### Correcciones de flujo
 - Commits de UI hechos inicialmente en main directamente (incorrecto)
 - Movidos a rama `feature/ui-improvements` para seguir workflow correcto
@@ -89,11 +97,11 @@
 - `TelemetryService.get_batches_with_data()` — batches con datos parseados
 
 ### Tests
-- 32 tests pasando
-- Tests para ConnectionManager, endpoints WS UI, servicios
+- 34 tests pasando
+- Tests para ConnectionManager, endpoints WS UI, servicios, gestión de clientes
 
 ### Workflow
 - Commits progresivos con TDD (tests primero)
-- Ramas: `feature/retro-ui`, `feature/live-ui`, `feature/ui-improvements`
+- Ramas: `feature/retro-ui`, `feature/live-ui`, `feature/ui-improvements`, `feature/client-management`
 - Push inmediato tras cada cambio
 - NUNCA merge directo a main, siempre usar PR
