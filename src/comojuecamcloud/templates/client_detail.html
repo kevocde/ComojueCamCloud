@@ -276,8 +276,8 @@
 
     function drawChart() {
         const svg = document.getElementById('chart');
-        const now = Math.floor(Date.now() / 1000);
-        const cutoff = now - (filterMinutes * 60);
+        const maxTimestamp = processedData.length > 0 ? processedData[processedData.length - 1].timestamp : Math.floor(Date.now() / 1000);
+        const cutoff = maxTimestamp - (filterMinutes * 60);
         const filtered = processedData.filter(function(d) { return d.timestamp >= cutoff; });
 
         const w = svg.clientWidth || 600;
