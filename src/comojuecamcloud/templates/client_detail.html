@@ -20,25 +20,203 @@
     </div>
 </div>
 
-<h2>Batches de telemetria</h2>
-
-{% if batches %}
-<div class="grid">
-    {% for batch in batches %}
-    <div class="card">
-        <a href="/clients/{{ client.token }}/{{ batch.timestamp }}" style="text-decoration:none;color:var(--fg);">
-            <h3 class="card-title">{{ batch.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h3>
-            <div class="card-meta">
-                <span class="meta-label">Timestamp</span>
-                <span class="meta-value">{{ batch.timestamp }}</span>
+<h2>Giroscopio</h2>
+<div class="card" id="gyro-widget">
+    <div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap;">
+        <div id="car-scene" style="perspective:400px;width:200px;height:120px;position:relative;">
+            <div id="car-body" style="position:absolute;width:100%;height:100%;transform-style:preserve-3d;transition:transform 0.3s ease;">
+                <div style="position:absolute;bottom:20px;left:30px;width:140px;height:50px;background:var(--accent);border-radius:8px 8px 4px 4px;"></div>
+                <div style="position:absolute;bottom:40px;left:60px;width:80px;height:30px;background:var(--accent-hover);border-radius:6px 6px 0 0;opacity:0.7;"></div>
+                <div style="position:absolute;bottom:10px;left:40px;width:25px;height:25px;background:var(--fg-muted);border-radius:50%;"></div>
+                <div style="position:absolute;bottom:10px;right:40px;width:25px;height:25px;background:var(--fg-muted);border-radius:50%;"></div>
             </div>
-        </a>
+        </div>
+        <div>
+            <div class="meta-row">
+                <span class="meta-label">X</span>
+                <span class="meta-value" id="gyro-x">—</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Y</span>
+                <span class="meta-value" id="gyro-y">—</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Z</span>
+                <span class="meta-value" id="gyro-z">—</span>
+            </div>
+        </div>
     </div>
-    {% endfor %}
 </div>
-{% else %}
-<div class="empty-state">
-    <p>Sin datos de telemetria para este cliente.</p>
+
+<h2>Acelerometro</h2>
+<div class="card">
+    <div style="margin-bottom:1rem;">
+        <button class="time-filter active" data-minutes="5">5m</button>
+        <button class="time-filter" data-minutes="10">10m</button>
+        <button class="time-filter" data-minutes="30">30m</button>
+        <button class="time-filter" data-minutes="60">1h</button>
+    </div>
+    <svg id="chart" width="100%" height="200" style="background:var(--surface-hover);border-radius:4px;"></svg>
+    <div class="meta-row" style="margin-top:1rem;">
+        <span class="meta-label">Magnitud actual</span>
+        <span class="meta-value" id="current-magnitude">—</span>
+    </div>
 </div>
-{% endif %}
+
+<h2>Posicion</h2>
+<div class="card" id="gps-widget">
+    <div class="meta-row">
+        <span class="meta-label">Latitud</span>
+        <span class="meta-value" id="gps-lat">—</span>
+    </div>
+    <div class="meta-row">
+        <span class="meta-label">Longitud</span>
+        <span class="meta-value" id="gps-lon">—</span>
+    </div>
+    <a id="maps-link" href="#" target="_blank" style="display:inline-block;margin-top:1rem;font-size:0.9rem;">Abrir en Google Maps</a>
+</div>
+
+<style>
+.time-filter {
+    background: var(--surface-hover);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.8rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.time-filter.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+}
+.time-filter:hover {
+    background: var(--accent-hover);
+}
+</style>
+
+<script>
+(function() {
+    const batchData = {{ batch_data | tojson }};
+    const allData = [];
+
+    batchData.forEach(function(batch) {
+        allData.push({
+            timestamp: batch.timestamp,
+            gyro: batch.data.gyroscope || {},
+            accel: batch.data.accelerometer || {},
+            gps: batch.data.gps || {}
+        });
+    });
+    allData.sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+    let filterMinutes = 5;
+
+    function updateGyro(gyro) {
+        const x = gyro.x || 0;
+        const y = gyro.y || 0;
+        const z = gyro.z || 0;
+        document.getElementById('gyro-x').textContent = x.toFixed(2);
+        document.getElementById('gyro-y').textContent = y.toFixed(2);
+        document.getElementById('gyro-z').textContent = z.toFixed(2);
+        const car = document.getElementById('car-body');
+        car.style.transform = 'rotateX(' + (x * 3) + 'deg) rotateY(' + (y * 3) + 'deg) rotateZ(' + (z * 3) + 'deg)';
+    }
+
+    function updateAccel(accel) {
+        const x = accel.x || 0;
+        const y = accel.y || 0;
+        const z = accel.z || 0;
+        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        document.getElementById('current-magnitude').textContent = magnitude.toFixed(2) + ' G';
+    }
+
+    function updateGps(gps) {
+        const lat = gps.latitude;
+        const lon = gps.longitude;
+        document.getElementById('gps-lat').textContent = lat !== undefined ? lat.toFixed(6) : '—';
+        document.getElementById('gps-lon').textContent = lon !== undefined ? lon.toFixed(6) : '—';
+        const link = document.getElementById('maps-link');
+        if (lat !== undefined && lon !== undefined) {
+            link.href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+        }
+    }
+
+    function drawChart() {
+        const svg = document.getElementById('chart');
+        const now = Math.floor(Date.now() / 1000);
+        const cutoff = now - (filterMinutes * 60);
+        const filtered = allData.filter(function(d) { return d.timestamp >= cutoff; });
+
+        if (filtered.length < 2) {
+            svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--fg-muted)" font-size="0.9rem">Datos insuficientes</text>';
+            return;
+        }
+
+        const w = svg.clientWidth;
+        const h = 200;
+        const padding = 30;
+        const minT = filtered[0].timestamp;
+        const maxT = filtered[filtered.length - 1].timestamp;
+        const magnitudes = filtered.map(function(d) {
+            const a = d.accel;
+            return Math.sqrt((a.x||0)*(a.x||0) + (a.y||0)*(a.y||0) + (a.z||0)*(a.z||0));
+        });
+        const maxMag = Math.max.apply(null, magnitudes) * 1.1 || 1;
+
+        let path = '';
+        filtered.forEach(function(d, i) {
+            const x = padding + ((d.timestamp - minT) / (maxT - minT || 1)) * (w - padding * 2);
+            const y = h - padding - (magnitudes[i] / maxMag) * (h - padding * 2);
+            path += (i === 0 ? 'M' : 'L') + x + ',' + y;
+        });
+
+        svg.innerHTML = '<path d="' + path + '" fill="none" stroke="var(--accent)" stroke-width="2"/>';
+    }
+
+    if (allData.length > 0) {
+        const last = allData[allData.length - 1];
+        updateGyro(last.gyro);
+        updateAccel(last.accel);
+        updateGps(last.gps);
+    }
+    drawChart();
+
+    document.querySelectorAll('.time-filter').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.time-filter').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            filterMinutes = parseInt(btn.getAttribute('data-minutes'));
+            drawChart();
+        });
+    });
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(protocol + '//' + location.host + '/ws/ui/{{ client.token }}');
+
+    ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== 'telemetry') return;
+
+        allData.push({
+            timestamp: msg.timestamp,
+            gyro: msg.data.gyroscope || {},
+            accel: msg.data.accelerometer || {},
+            gps: msg.data.gps || {}
+        });
+
+        updateGyro(msg.data.gyroscope || {});
+        updateAccel(msg.data.accelerometer || {});
+        updateGps(msg.data.gps || {});
+        drawChart();
+    };
+
+    ws.onclose = function() {
+        setTimeout(function() { location.reload(); }, 3000);
+    };
+})();
+</script>
 {% endblock %}
