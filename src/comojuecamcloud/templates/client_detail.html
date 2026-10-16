@@ -22,27 +22,52 @@
 
 <h2>Giroscopio</h2>
 <div class="card" id="gyro-widget">
-    <div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap;">
-        <div style="flex:1;min-width:250px;">
+    <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
             <div id="gyro-canvas"></div>
         </div>
-        <div style="min-width:150px;">
-            <div class="meta-row">
-                <span class="meta-label" style="color:#ff5555;">Roll</span>
-                <span class="meta-value" id="gyro-x">—</span>
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;align-items:center;">
+            <svg id="horizon" width="200" height="200" viewBox="0 0 200 200" style="background:var(--surface-hover);border-radius:8px;">
+                <defs>
+                    <clipPath id="circle-clip">
+                        <circle cx="100" cy="100" r="90"/>
+                    </clipPath>
+                </defs>
+                <g clip-path="url(#circle-clip)">
+                    <g id="horizon-level">
+                        <rect x="0" y="0" width="200" height="100" fill="#3b4261"/>
+                        <rect x="0" y="100" width="200" height="100" fill="#8b6f47"/>
+                        <line x1="0" y1="100" x2="200" y2="100" stroke="#ffffff" stroke-width="2"/>
+                        <line x1="80" y1="100" x2="120" y2="100" stroke="#ffffff" stroke-width="3"/>
+                    </g>
+                </g>
+                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--border)" stroke-width="2"/>
+                <path d="M 100 20 L 105 30 L 95 30 Z" fill="var(--accent)"/>
+                <line x1="70" y1="100" x2="95" y2="100" stroke="var(--accent)" stroke-width="2"/>
+                <line x1="105" y1="100" x2="130" y2="100" stroke="var(--accent)" stroke-width="2"/>
+                <circle cx="100" cy="100" r="3" fill="var(--accent)"/>
+            </svg>
+            <div style="margin-top:0.5rem;font-size:0.85rem;color:var(--fg-muted);">
+                Inclinación: <span id="pitch-deg" style="color:var(--accent);font-weight:700;">—</span>
             </div>
-            <div class="meta-row">
-                <span class="meta-label" style="color:#55ff55;">Pitch</span>
-                <span class="meta-value" id="gyro-y">—</span>
-            </div>
-            <div class="meta-row">
-                <span class="meta-label" style="color:#5555ff;">Yaw</span>
-                <span class="meta-value" id="gyro-z">—</span>
-            </div>
-            <div class="meta-row">
-                <span class="meta-label">Heading</span>
-                <span class="meta-value" id="heading-deg">—</span>
-            </div>
+        </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;margin-top:1.5rem;">
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label" style="color:#ff5555;">Roll</span>
+            <span class="meta-value" id="gyro-x" style="font-size:1.1rem;">—</span>
+        </div>
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label" style="color:#55ff55;">Pitch</span>
+            <span class="meta-value" id="gyro-y" style="font-size:1.1rem;">—</span>
+        </div>
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label" style="color:#5555ff;">Yaw</span>
+            <span class="meta-value" id="gyro-z" style="font-size:1.1rem;">—</span>
+        </div>
+        <div class="meta-row" style="flex-direction:column;gap:0.3rem;border:none;">
+            <span class="meta-label">Heading</span>
+            <span class="meta-value" id="heading-deg" style="font-size:1.1rem;">—</span>
         </div>
     </div>
 </div>
@@ -98,6 +123,9 @@
 }
 .time-filter:hover {
     background: var(--accent-hover);
+}
+#horizon-level {
+    transition: transform 0.3s ease;
 }
 </style>
 
@@ -362,8 +390,6 @@
         document.getElementById('gyro-z').textContent = yawDeg.toFixed(1) + '\u00B0';
 
         let heading = ((-yawDeg % 360) + 360) % 360;
-        document.getElementById('heading-deg').textContent = heading.toFixed(0) + '\u00B0';
-
         const cardinal = heading < 22.5 || heading >= 337.5 ? 'N' :
                          heading < 67.5 ? 'NE' :
                          heading < 112.5 ? 'E' :
@@ -372,6 +398,17 @@
                          heading < 247.5 ? 'SW' :
                          heading < 292.5 ? 'W' : 'NW';
         document.getElementById('heading-deg').textContent = heading.toFixed(0) + '\u00B0 ' + cardinal;
+
+        const pitchAdjusted = 90 - rollDeg;
+        document.getElementById('pitch-deg').textContent = pitchAdjusted.toFixed(1) + '\u00B0';
+
+        const horizonLevel = document.getElementById('horizon-level');
+        if (horizonLevel) {
+            const maxAngle = 45;
+            const clampedPitch = Math.max(-maxAngle, Math.min(maxAngle, pitchAdjusted));
+            const rotationAngle = -clampedPitch * 2;
+            horizonLevel.setAttribute('transform', 'rotate(' + rotationAngle + ', 100, 100)');
+        }
 
         if (bus) {
             bus.rotation.x = orientation.roll;
