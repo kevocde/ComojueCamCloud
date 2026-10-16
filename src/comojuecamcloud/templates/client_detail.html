@@ -20,25 +20,507 @@
     </div>
 </div>
 
-<h2>Batches de telemetria</h2>
-
-{% if batches %}
-<div class="grid">
-    {% for batch in batches %}
-    <div class="card">
-        <a href="/clients/{{ client.token }}/{{ batch.timestamp }}" style="text-decoration:none;color:var(--fg);">
-            <h3 class="card-title">{{ batch.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h3>
-            <div class="card-meta">
-                <span class="meta-label">Timestamp</span>
-                <span class="meta-value">{{ batch.timestamp }}</span>
+<h2>Giroscopio</h2>
+<div class="card" id="gyro-widget">
+    <div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:250px;">
+            <div id="gyro-canvas"></div>
+        </div>
+        <div style="min-width:150px;">
+            <div class="meta-row">
+                <span class="meta-label" style="color:#ff5555;">Roll</span>
+                <span class="meta-value" id="gyro-x">—</span>
             </div>
-        </a>
+            <div class="meta-row">
+                <span class="meta-label" style="color:#55ff55;">Pitch</span>
+                <span class="meta-value" id="gyro-y">—</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label" style="color:#5555ff;">Yaw</span>
+                <span class="meta-value" id="gyro-z">—</span>
+            </div>
+        </div>
     </div>
-    {% endfor %}
 </div>
-{% else %}
-<div class="empty-state">
-    <p>Sin datos de telemetria para este cliente.</p>
+
+<h2>Acelerometro</h2>
+<div class="card">
+    <div style="margin-bottom:1rem;">
+        <button class="time-filter active" data-minutes="5">5m</button>
+        <button class="time-filter" data-minutes="10">10m</button>
+        <button class="time-filter" data-minutes="30">30m</button>
+        <button class="time-filter" data-minutes="60">1h</button>
+    </div>
+    <svg id="chart" width="100%" height="220" style="background:var(--surface-hover);border-radius:4px;"></svg>
+    <div class="meta-row" style="margin-top:1rem;">
+        <span class="meta-label">G instantánea</span>
+        <span class="meta-value" id="current-g">—</span>
+    </div>
+    <div class="meta-row">
+        <span class="meta-label">Aceleración lineal</span>
+        <span class="meta-value" id="current-linear">—</span>
+    </div>
 </div>
-{% endif %}
+
+<h2>Posicion</h2>
+<div class="card" id="gps-widget">
+    <div class="meta-row">
+        <span class="meta-label">Latitud</span>
+        <span class="meta-value" id="gps-lat">—</span>
+    </div>
+    <div class="meta-row">
+        <span class="meta-label">Longitud</span>
+        <span class="meta-value" id="gps-lon">—</span>
+    </div>
+    <a id="maps-link" href="#" target="_blank" style="display:inline-block;margin-top:1rem;font-size:0.9rem;">Abrir en Google Maps</a>
+</div>
+
+<style>
+.time-filter {
+    background: var(--surface-hover);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.8rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.time-filter.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+}
+.time-filter:hover {
+    background: var(--accent-hover);
+}
+</style>
+
+<script>
+(function() {
+    const GRAVITY_EARTH = 9.80665;
+    const ALPHA = 0.8;
+    const FUSION_ALPHA = 0.96;
+    const batchData = {{ batch_data | tojson }};
+    const rawData = [];
+
+    batchData.forEach(function(batch) {
+        rawData.push({
+            timestamp: batch.timestamp,
+            gyro: batch.data.gyroscope || {},
+            accel: batch.data.accelerometer || {},
+            mag: batch.data.magnetometer || {},
+            gps: batch.data.gps || {}
+        });
+    });
+    rawData.sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+    const processedData = [];
+    let gravity = { x: 0, y: 0, z: 0 };
+    let gravityInitialized = false;
+    let orientation = { roll: 0, pitch: 0, yaw: 0 };
+    let lastTimestamp = null;
+
+    function calcAccelOrientation(accel) {
+        const ax = accel.x || 0;
+        const ay = accel.y || 0;
+        const az = accel.z || 0;
+        const roll = Math.atan2(ay, Math.sqrt(ax * ax + az * az));
+        const pitch = Math.atan2(-ax, Math.sqrt(ay * ay + az * az));
+        return { roll: roll, pitch: pitch };
+    }
+
+    function calcMagHeading(mag, roll, pitch) {
+        const mx = mag.x || 0;
+        const my = mag.y || 0;
+        const mz = mag.z || 0;
+        const cosRoll = Math.cos(roll);
+        const sinRoll = Math.sin(roll);
+        const cosPitch = Math.cos(pitch);
+        const sinPitch = Math.sin(pitch);
+        const Mx = mx * cosPitch + mz * sinPitch;
+        const My = mx * sinRoll * sinPitch + my * cosRoll - mz * sinRoll * cosPitch;
+        const heading = Math.atan2(-My, Mx);
+        return heading;
+    }
+
+    rawData.forEach(function(d) {
+        const raw = d.accel;
+        const rx = raw.x || 0;
+        const ry = raw.y || 0;
+        const rz = raw.z || 0;
+
+        if (!gravityInitialized) {
+            gravity.x = rx;
+            gravity.y = ry;
+            gravity.z = rz;
+            gravityInitialized = true;
+            const accelOrient = calcAccelOrientation(raw);
+            orientation.roll = accelOrient.roll;
+            orientation.pitch = accelOrient.pitch;
+            if (d.mag.x !== undefined) {
+                orientation.yaw = calcMagHeading(d.mag, orientation.roll, orientation.pitch);
+            }
+            lastTimestamp = d.timestamp;
+            processedData.push({
+                timestamp: d.timestamp,
+                gyro: d.gyro,
+                linear: { x: 0, y: 0, z: 0 },
+                magnitude: 0,
+                g: 0,
+                orientation: { roll: orientation.roll, pitch: orientation.pitch, yaw: orientation.yaw },
+                gps: d.gps
+            });
+            return;
+        }
+
+        gravity.x = ALPHA * gravity.x + (1 - ALPHA) * rx;
+        gravity.y = ALPHA * gravity.y + (1 - ALPHA) * ry;
+        gravity.z = ALPHA * gravity.z + (1 - ALPHA) * rz;
+
+        const linear = {
+            x: rx - gravity.x,
+            y: ry - gravity.y,
+            z: rz - gravity.z
+        };
+
+        const magnitude = Math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z);
+        const g = magnitude / GRAVITY_EARTH;
+
+        const dt = (d.timestamp - lastTimestamp) || 1;
+        lastTimestamp = d.timestamp;
+
+        const gyroRad = {
+            x: (d.gyro.x || 0) * Math.PI / 180,
+            y: (d.gyro.y || 0) * Math.PI / 180,
+            z: (d.gyro.z || 0) * Math.PI / 180
+        };
+
+        const gyroIntegrated = {
+            roll: orientation.roll + gyroRad.x * dt,
+            pitch: orientation.pitch + gyroRad.y * dt,
+            yaw: orientation.yaw + gyroRad.z * dt
+        };
+
+        const accelOrient = calcAccelOrientation(raw);
+        const magYaw = calcMagHeading(d.mag, accelOrient.roll, accelOrient.pitch);
+
+        orientation.roll = FUSION_ALPHA * gyroIntegrated.roll + (1 - FUSION_ALPHA) * accelOrient.roll;
+        orientation.pitch = FUSION_ALPHA * gyroIntegrated.pitch + (1 - FUSION_ALPHA) * accelOrient.pitch;
+        orientation.yaw = FUSION_ALPHA * gyroIntegrated.yaw + (1 - FUSION_ALPHA) * magYaw;
+
+        processedData.push({
+            timestamp: d.timestamp,
+            gyro: d.gyro,
+            linear: linear,
+            magnitude: magnitude,
+            g: g,
+            orientation: { roll: orientation.roll, pitch: orientation.pitch, yaw: orientation.yaw },
+            gps: d.gps
+        });
+    });
+
+    let filterMinutes = 5;
+
+    function formatTime(ts) {
+        const d = new Date(ts * 1000);
+        return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    }
+
+    let scene, camera, renderer, bus;
+
+    function initThreeJS() {
+        const container = document.getElementById('gyro-canvas');
+        const width = container.clientWidth;
+        const height = 250;
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2f3347);
+
+        camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        camera.position.set(3, 2, 4);
+        camera.lookAt(0, 0, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7);
+        scene.add(directionalLight);
+
+        bus = new THREE.Group();
+
+        const bodyGeometry = new THREE.BoxGeometry(3, 1.2, 1.5);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x89b4fa });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.6;
+        bus.add(body);
+
+        const windowGeometry = new THREE.BoxGeometry(2.8, 0.6, 1.4);
+        const windowMaterial = new THREE.MeshPhongMaterial({ color: 0x7aa2f7, opacity: 0.7, transparent: true });
+        const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
+        windowMesh.position.y = 1.5;
+        bus.add(windowMesh);
+
+        const wheelGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 16);
+        const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x6c7086 });
+
+        const wheel1 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel1.rotation.z = Math.PI / 2;
+        wheel1.position.set(-1, 0.1, 0.75);
+        bus.add(wheel1);
+
+        const wheel2 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel2.rotation.z = Math.PI / 2;
+        wheel2.position.set(1, 0.1, 0.75);
+        bus.add(wheel2);
+
+        const wheel3 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel3.rotation.z = Math.PI / 2;
+        wheel3.position.set(-1, 0.1, -0.75);
+        bus.add(wheel3);
+
+        const wheel4 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel4.rotation.z = Math.PI / 2;
+        wheel4.position.set(1, 0.1, -0.75);
+        bus.add(wheel4);
+
+        scene.add(bus);
+
+        animate();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+
+    function updateGyro(orientation) {
+        const rollDeg = (orientation.roll * 180 / Math.PI);
+        const pitchDeg = (orientation.pitch * 180 / Math.PI);
+        const yawDeg = (orientation.yaw * 180 / Math.PI);
+
+        document.getElementById('gyro-x').textContent = rollDeg.toFixed(1) + '\u00B0';
+        document.getElementById('gyro-y').textContent = pitchDeg.toFixed(1) + '\u00B0';
+        document.getElementById('gyro-z').textContent = yawDeg.toFixed(1) + '\u00B0';
+
+        if (bus) {
+            bus.rotation.x = orientation.roll;
+            bus.rotation.y = orientation.pitch;
+            bus.rotation.z = orientation.yaw;
+        }
+    }
+
+    function updateAccelDisplay(d) {
+        document.getElementById('current-g').textContent = d.g.toFixed(3) + ' G';
+        document.getElementById('current-linear').textContent = d.magnitude.toFixed(2) + ' m/s²';
+    }
+
+    function updateGps(gps) {
+        const lat = gps.latitude;
+        const lon = gps.longitude;
+        document.getElementById('gps-lat').textContent = lat !== undefined ? lat.toFixed(6) : '—';
+        document.getElementById('gps-lon').textContent = lon !== undefined ? lon.toFixed(6) : '—';
+        const link = document.getElementById('maps-link');
+        if (lat !== undefined && lon !== undefined) {
+            link.href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+        }
+    }
+
+    function interpolateData(filtered, targetPoints) {
+        if (filtered.length >= targetPoints) return filtered;
+        if (filtered.length < 2) return filtered;
+
+        const result = [];
+        const startT = filtered[0].timestamp;
+        const endT = filtered[filtered.length - 1].timestamp;
+        const step = (endT - startT) / (targetPoints - 1);
+
+        for (let i = 0; i < targetPoints; i++) {
+            const t = startT + (i * step);
+            
+            let lower = filtered[0];
+            let upper = filtered[filtered.length - 1];
+            
+            for (let j = 0; j < filtered.length - 1; j++) {
+                if (filtered[j].timestamp <= t && filtered[j + 1].timestamp >= t) {
+                    lower = filtered[j];
+                    upper = filtered[j + 1];
+                    break;
+                }
+            }
+
+            const range = upper.timestamp - lower.timestamp;
+            const factor = range > 0 ? (t - lower.timestamp) / range : 0;
+
+            const g = lower.g + (upper.g - lower.g) * factor;
+            const magnitude = lower.magnitude + (upper.magnitude - lower.magnitude) * factor;
+
+            result.push({
+                timestamp: t,
+                g: g,
+                magnitude: magnitude,
+                gyro: lower.gyro,
+                linear: lower.linear,
+                gps: lower.gps
+            });
+        }
+
+        return result;
+    }
+
+    function drawChart() {
+        const svg = document.getElementById('chart');
+        const maxTimestamp = processedData.length > 0 ? processedData[processedData.length - 1].timestamp : Math.floor(Date.now() / 1000);
+        const cutoff = maxTimestamp - (filterMinutes * 60);
+        const filtered = processedData.filter(function(d) { return d.timestamp >= cutoff; });
+
+        const w = svg.clientWidth || 600;
+        const h = 220;
+        const padL = 50;
+        const padR = 20;
+        const padT = 15;
+        const padB = 35;
+        const plotW = w - padL - padR;
+        const plotH = h - padT - padB;
+
+        if (filtered.length < 2) {
+            svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--fg-muted)" font-size="0.9rem">Datos insuficientes</text>';
+            return;
+        }
+
+        const displayData = interpolateData(filtered, 20);
+
+        const minT = displayData[0].timestamp;
+        const maxT = displayData[displayData.length - 1].timestamp;
+        const maxG = Math.max.apply(null, displayData.map(function(p) { return p.g; })) * 1.1 || 0.1;
+
+        let svgContent = '';
+
+        svgContent += '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (padL + plotW) + '" y2="' + (padT + plotH) + '" stroke="var(--border)" stroke-width="1"/>';
+        svgContent += '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT + plotH) + '" stroke="var(--border)" stroke-width="1"/>';
+
+        const ySteps = 4;
+        for (var i = 0; i <= ySteps; i++) {
+            const yVal = (maxG / ySteps) * i;
+            const yPos = padT + plotH - (i / ySteps) * plotH;
+            svgContent += '<line x1="' + padL + '" y1="' + yPos + '" x2="' + (padL + plotW) + '" y2="' + yPos + '" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,4" opacity="0.4"/>';
+            svgContent += '<text x="' + (padL - 6) + '" y="' + (yPos + 4) + '" text-anchor="end" fill="var(--fg-muted)" font-size="0.7rem">' + yVal.toFixed(2) + '</text>';
+        }
+        svgContent += '<text x="' + (padL - 6) + '" y="' + (padT - 4) + '" text-anchor="end" fill="var(--fg-muted)" font-size="0.65rem">Gs</text>';
+
+        const xLabelCount = Math.min(5, displayData.length);
+        for (var j = 0; j < xLabelCount; j++) {
+            const idx = Math.floor((j / (xLabelCount - 1)) * (displayData.length - 1));
+            const xPos = padL + ((displayData[idx].timestamp - minT) / (maxT - minT || 1)) * plotW;
+            svgContent += '<line x1="' + xPos + '" y1="' + (padT + plotH) + '" x2="' + xPos + '" y2="' + (padT + plotH + 4) + '" stroke="var(--border)" stroke-width="1"/>';
+            svgContent += '<text x="' + xPos + '" y="' + (padT + plotH + 16) + '" text-anchor="middle" fill="var(--fg-muted)" font-size="0.7rem">' + formatTime(displayData[idx].timestamp) + '</text>';
+        }
+
+        let path = '';
+        displayData.forEach(function(p, i) {
+            const x = padL + ((p.timestamp - minT) / (maxT - minT || 1)) * plotW;
+            const y = padT + plotH - (p.g / maxG) * plotH;
+            path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+        });
+        svgContent += '<path d="' + path + '" fill="none" stroke="var(--accent)" stroke-width="2"/>';
+
+        svg.innerHTML = svgContent;
+    }
+
+    initThreeJS();
+
+    if (processedData.length > 0) {
+        const last = processedData[processedData.length - 1];
+        updateGyro(last.orientation);
+        updateAccelDisplay(last);
+        updateGps(last.gps);
+    }
+    drawChart();
+
+    document.querySelectorAll('.time-filter').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.time-filter').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            filterMinutes = parseInt(btn.getAttribute('data-minutes'));
+            drawChart();
+        });
+    });
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(protocol + '//' + location.host + '/ws/ui/{{ client.token }}');
+
+    ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== 'telemetry') return;
+
+        const raw = msg.data.accelerometer || {};
+        const rx = raw.x || 0;
+        const ry = raw.y || 0;
+        const rz = raw.z || 0;
+
+        gravity.x = ALPHA * gravity.x + (1 - ALPHA) * rx;
+        gravity.y = ALPHA * gravity.y + (1 - ALPHA) * ry;
+        gravity.z = ALPHA * gravity.z + (1 - ALPHA) * rz;
+
+        const linear = {
+            x: rx - gravity.x,
+            y: ry - gravity.y,
+            z: rz - gravity.z
+        };
+
+        const magnitude = Math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z);
+        const g = magnitude / GRAVITY_EARTH;
+
+        const dt = (msg.timestamp - lastTimestamp) || 1;
+        lastTimestamp = msg.timestamp;
+
+        const gyroRad = {
+            x: ((msg.data.gyroscope || {}).x || 0) * Math.PI / 180,
+            y: ((msg.data.gyroscope || {}).y || 0) * Math.PI / 180,
+            z: ((msg.data.gyroscope || {}).z || 0) * Math.PI / 180
+        };
+
+        const gyroIntegrated = {
+            roll: orientation.roll + gyroRad.x * dt,
+            pitch: orientation.pitch + gyroRad.y * dt,
+            yaw: orientation.yaw + gyroRad.z * dt
+        };
+
+        const accelOrient = calcAccelOrientation(raw);
+        const magData = msg.data.magnetometer || {};
+        const magYaw = calcMagHeading(magData, accelOrient.roll, accelOrient.pitch);
+
+        orientation.roll = FUSION_ALPHA * gyroIntegrated.roll + (1 - FUSION_ALPHA) * accelOrient.roll;
+        orientation.pitch = FUSION_ALPHA * gyroIntegrated.pitch + (1 - FUSION_ALPHA) * accelOrient.pitch;
+        orientation.yaw = FUSION_ALPHA * gyroIntegrated.yaw + (1 - FUSION_ALPHA) * magYaw;
+
+        const processed = {
+            timestamp: msg.timestamp,
+            gyro: msg.data.gyroscope || {},
+            linear: linear,
+            magnitude: magnitude,
+            g: g,
+            orientation: { roll: orientation.roll, pitch: orientation.pitch, yaw: orientation.yaw },
+            gps: msg.data.gps || {}
+        };
+
+        processedData.push(processed);
+
+        updateGyro(processed.orientation);
+        updateAccelDisplay(processed);
+        updateGps(msg.data.gps || {});
+        drawChart();
+    };
+
+    ws.onclose = function() {
+        setTimeout(function() { location.reload(); }, 3000);
+    };
+})();
+</script>
 {% endblock %}

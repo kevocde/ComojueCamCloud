@@ -53,3 +53,14 @@ class TelemetryService:
             select(TelemetryData).where(TelemetryData.batch_id == batch_id)
         )
         return result.scalars().all()
+
+    async def get_batches_with_data(self, client_token: str) -> List[Dict[str, Any]]:
+        batches = await self.get_batches(client_token)
+        result = []
+        for batch in batches:
+            telemetry_data = await self.get_telemetry_data(batch.id)
+            data = {}
+            for td in telemetry_data:
+                data[td.category] = json.loads(td.values_json)
+            result.append({"timestamp": batch.timestamp, "data": data})
+        return result

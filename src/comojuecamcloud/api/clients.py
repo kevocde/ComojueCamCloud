@@ -19,7 +19,7 @@ env = Environment(loader=FileSystemLoader(str(templates_dir)), auto_reload=True)
 @router.get("/clients")
 async def list_clients(request: Request, db: AsyncSession = Depends(get_db)):
     client_service = ClientService(db)
-    clients = await client_service.get_active_clients()
+    clients = await client_service.get_all_clients()
 
     template = env.get_template("clients.html")
     html = template.render(request=request, clients=clients)
@@ -37,10 +37,10 @@ async def client_detail(request: Request, token: str, db: AsyncSession = Depends
         html = template.render(request=request, error="Client not found")
         return HTMLResponse(content=html, status_code=404)
 
-    batches = await telemetry_service.get_batches(token)
+    batch_data = await telemetry_service.get_batches_with_data(token)
 
     template = env.get_template("client_detail.html")
-    html = template.render(request=request, client=client, batches=batches)
+    html = template.render(request=request, client=client, batch_data=batch_data)
     return HTMLResponse(content=html)
 
 

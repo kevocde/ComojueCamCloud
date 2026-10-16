@@ -4,12 +4,12 @@
 <h1>Clientes</h1>
 
 {% if clients %}
-<div class="grid">
+<div class="grid" id="clients-grid">
     {% for client in clients %}
-    <div class="card">
+    <div class="card client-card {% if not client.is_active %}inactive{% endif %}" data-token="{{ client.token }}">
         <div class="card-header">
             <h3 class="card-title">{{ client.token }}</h3>
-            <span class="status-dot" title="Online"></span>
+            <span class="status-dot {% if client.is_active %}active{% else %}inactive-dot{% endif %}" title="{{ 'Online' if client.is_active else 'Offline' }}"></span>
         </div>
         <div class="card-meta">
             <div class="meta-row">
@@ -18,8 +18,13 @@
             </div>
             <div class="meta-row">
                 <span class="meta-label">Ultima vez</span>
-                <span class="meta-value">{{ client.last_seen.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="meta-value last-seen">{{ client.last_seen.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
+            {% if not client.is_active %}
+            <div class="meta-row">
+                <span class="status-label">INACTIVO</span>
+            </div>
+            {% endif %}
         </div>
         <a href="/clients/{{ client.token }}" style="display:inline-block;margin-top:1rem;font-size:0.9rem;">Ver telemetria</a>
     </div>
@@ -27,8 +32,62 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <h2>Sin clientes activos</h2>
+    <h2>Sin clientes</h2>
     <p>Los clientes conectados apareceran aqui automaticamente.</p>
 </div>
 {% endif %}
+
+<script>
+(function() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(protocol + '//' + location.host + '/ws/ui/clients');
+
+    ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== 'client_update') return;
+
+        const grid = document.getElementById('clients-grid');
+        if (!grid) return;
+
+        let card = grid.querySelector('[data-token="' + msg.token + '"]');
+
+        if (!card) {
+            card = document.createElement('div');
+            card.className = 'card client-card';
+            card.setAttribute('data-token', msg.token);
+            card.innerHTML = '<div class="card-header"><h3 class="card-title">' + msg.token + '</h3><span class="status-dot active" title="Online"></span></div><div class="card-meta"><div class="meta-row"><span class="meta-label">Conectado</span><span class="meta-value">ahora</span></div><div class="meta-row"><span class="meta-label">Ultima vez</span><span class="meta-value last-seen">ahora</span></div></div><a href="/clients/' + msg.token + '" style="display:inline-block;margin-top:1rem;font-size:0.9rem;">Ver telemetria</a>';
+            grid.insertBefore(card, grid.firstChild);
+            return;
+        }
+
+        const dot = card.querySelector('.status-dot');
+        const lastSeen = card.querySelector('.last-seen');
+
+        if (msg.status === 'active') {
+            card.classList.remove('inactive');
+            dot.classList.remove('inactive-dot');
+            dot.classList.add('active');
+            dot.title = 'Online';
+            if (lastSeen) lastSeen.textContent = 'ahora';
+            const statusRow = card.querySelector('.status-label');
+            if (statusRow) statusRow.parentElement.remove();
+        } else {
+            card.classList.add('inactive');
+            dot.classList.remove('active');
+            dot.classList.add('inactive-dot');
+            dot.title = 'Offline';
+            if (!card.querySelector('.status-label')) {
+                const row = document.createElement('div');
+                row.className = 'meta-row';
+                row.innerHTML = '<span class="status-label">INACTIVO</span>';
+                card.querySelector('.card-meta').appendChild(row);
+            }
+        }
+    };
+
+    ws.onclose = function() {
+        setTimeout(function() { location.reload(); }, 3000);
+    };
+})();
+</script>
 {% endblock %}
