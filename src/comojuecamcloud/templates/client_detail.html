@@ -23,38 +23,20 @@
 <h2>Giroscopio</h2>
 <div class="card" id="gyro-widget">
     <div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap;">
-        <div id="car-scene" style="perspective:600px;width:220px;height:180px;position:relative;">
-            <div id="axes-container" style="position:absolute;width:100%;height:100%;top:0;left:0;pointer-events:none;">
-                <div style="position:absolute;top:50%;left:50%;width:80px;height:2px;background:#ff5555;transform-origin:0 50%;transform:translate(0,-50%);"></div>
-                <div style="position:absolute;top:50%;left:50%;width:2px;height:80px;background:#55ff55;transform-origin:50% 100%;transform:translate(-50%,0) rotate(0deg);bottom:50%;"></div>
-                <div style="position:absolute;top:50%;left:50%;width:60px;height:2px;background:#5555ff;transform-origin:0 50%;transform:translate(0,-50%) rotate(-45deg);"></div>
-                <div style="position:absolute;top:calc(50% - 18px);left:calc(50% + 85px);color:#ff5555;font-size:0.75rem;font-weight:700;">X</div>
-                <div style="position:absolute;top:calc(50% - 95px);left:calc(50% - 4px);color:#55ff55;font-size:0.75rem;font-weight:700;">Y</div>
-                <div style="position:absolute;top:calc(50% - 55px);left:calc(50% + 40px);color:#5555ff;font-size:0.75rem;font-weight:700;">Z</div>
-            </div>
-            <div id="car-body" style="position:absolute;width:100%;height:100%;transform-style:preserve-3d;transition:transform 0.3s ease;transform:rotateX(-20deg) rotateY(-30deg);">
-                <div style="position:absolute;width:140px;height:55px;left:40px;top:60px;background:var(--accent);border:1px solid var(--accent-hover);transform:translateZ(30px);"></div>
-                <div style="position:absolute;width:140px;height:55px;left:40px;top:60px;background:var(--accent-hover);border:1px solid var(--accent);transform:translateZ(-30px);"></div>
-                <div style="position:absolute;width:60px;height:55px;left:40px;top:60px;background:var(--accent-hover);border:1px solid var(--accent);transform:rotateY(90deg) translateZ(0px);transform-origin:left;"></div>
-                <div style="position:absolute;width:60px;height:55px;left:180px;top:60px;background:var(--accent-hover);border:1px solid var(--accent);transform:rotateY(90deg) translateZ(0px);transform-origin:left;"></div>
-                <div style="position:absolute;width:140px;height:60px;left:40px;top:60px;background:var(--accent);border:1px solid var(--accent-hover);transform:rotateX(90deg) translateZ(-30px);transform-origin:top;"></div>
-                <div style="position:absolute;width:140px;height:60px;left:40px;top:115px;background:var(--bg);border:1px solid var(--border);transform:rotateX(90deg) translateZ(-30px);transform-origin:top;"></div>
-                <div style="position:absolute;width:100px;height:35px;left:60px;top:35px;background:var(--accent-hover);border:1px solid var(--accent);transform:translateZ(30px);opacity:0.6;border-radius:4px 4px 0 0;"></div>
-                <div style="position:absolute;width:20px;height:20px;left:50px;top:110px;background:var(--fg-muted);border-radius:50%;transform:translateZ(30px);"></div>
-                <div style="position:absolute;width:20px;height:20px;right:50px;top:110px;background:var(--fg-muted);border-radius:50%;transform:translateZ(30px);"></div>
-            </div>
+        <div style="flex:1;min-width:250px;">
+            <div id="gyro-canvas"></div>
         </div>
-        <div>
+        <div style="min-width:150px;">
             <div class="meta-row">
-                <span class="meta-label" style="color:#ff5555;">Angulo X</span>
+                <span class="meta-label" style="color:#ff5555;">Rotación X</span>
                 <span class="meta-value" id="gyro-x">—</span>
             </div>
             <div class="meta-row">
-                <span class="meta-label" style="color:#55ff55;">Angulo Y</span>
+                <span class="meta-label" style="color:#55ff55;">Rotación Y</span>
                 <span class="meta-value" id="gyro-y">—</span>
             </div>
             <div class="meta-row">
-                <span class="meta-label" style="color:#5555ff;">Angulo Z</span>
+                <span class="meta-label" style="color:#5555ff;">Rotación Z</span>
                 <span class="meta-value" id="gyro-z">—</span>
             </div>
         </div>
@@ -71,8 +53,12 @@
     </div>
     <svg id="chart" width="100%" height="220" style="background:var(--surface-hover);border-radius:4px;"></svg>
     <div class="meta-row" style="margin-top:1rem;">
-        <span class="meta-label">Magnitud actual</span>
-        <span class="meta-value" id="current-magnitude">—</span>
+        <span class="meta-label">G instantánea</span>
+        <span class="meta-value" id="current-g">—</span>
+    </div>
+    <div class="meta-row">
+        <span class="meta-label">Aceleración lineal</span>
+        <span class="meta-value" id="current-linear">—</span>
     </div>
 </div>
 
@@ -109,27 +95,73 @@
 .time-filter:hover {
     background: var(--accent-hover);
 }
-#axes-container {
-    transition: transform 0.3s ease;
-    transform-style: preserve-3d;
-}
 </style>
 
 <script>
 (function() {
-    const G = 9.80665;
+    const GRAVITY_EARTH = 9.80665;
+    const ALPHA = 0.8;
     const batchData = {{ batch_data | tojson }};
-    const allData = [];
+    const rawData = [];
 
     batchData.forEach(function(batch) {
-        allData.push({
+        rawData.push({
             timestamp: batch.timestamp,
             gyro: batch.data.gyroscope || {},
             accel: batch.data.accelerometer || {},
             gps: batch.data.gps || {}
         });
     });
-    allData.sort(function(a, b) { return a.timestamp - b.timestamp; });
+    rawData.sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+    const processedData = [];
+    let gravity = { x: 0, y: 0, z: 0 };
+    let gravityInitialized = false;
+
+    rawData.forEach(function(d) {
+        const raw = d.accel;
+        const rx = raw.x || 0;
+        const ry = raw.y || 0;
+        const rz = raw.z || 0;
+
+        if (!gravityInitialized) {
+            gravity.x = rx;
+            gravity.y = ry;
+            gravity.z = rz;
+            gravityInitialized = true;
+            processedData.push({
+                timestamp: d.timestamp,
+                gyro: d.gyro,
+                linear: { x: 0, y: 0, z: 0 },
+                magnitude: 0,
+                g: 0,
+                gps: d.gps
+            });
+            return;
+        }
+
+        gravity.x = ALPHA * gravity.x + (1 - ALPHA) * rx;
+        gravity.y = ALPHA * gravity.y + (1 - ALPHA) * ry;
+        gravity.z = ALPHA * gravity.z + (1 - ALPHA) * rz;
+
+        const linear = {
+            x: rx - gravity.x,
+            y: ry - gravity.y,
+            z: rz - gravity.z
+        };
+
+        const magnitude = Math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z);
+        const g = magnitude / GRAVITY_EARTH;
+
+        processedData.push({
+            timestamp: d.timestamp,
+            gyro: d.gyro,
+            linear: linear,
+            magnitude: magnitude,
+            g: g,
+            gps: d.gps
+        });
+    });
 
     let filterMinutes = 5;
 
@@ -138,33 +170,104 @@
         return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
     }
 
-    function updateGyro(gyro) {
-        const x = gyro.x || 0;
-        const y = gyro.y || 0;
-        const z = gyro.z || 0;
-        document.getElementById('gyro-x').textContent = x.toFixed(1) + '\u00B0';
-        document.getElementById('gyro-y').textContent = y.toFixed(1) + '\u00B0';
-        document.getElementById('gyro-z').textContent = z.toFixed(1) + '\u00B0';
-        const car = document.getElementById('car-body');
-        car.style.transform = 'rotateX(' + (-20 + x * 0.5) + 'deg) rotateY(' + (-30 + y * 0.5) + 'deg) rotateZ(' + (z * 0.5) + 'deg)';
-        const axes = document.getElementById('axes-container');
-        axes.style.transform = 'rotateX(' + (x * 0.5) + 'deg) rotateY(' + (y * 0.5) + 'deg) rotateZ(' + (z * 0.5) + 'deg)';
+    let scene, camera, renderer, bus;
+
+    function initThreeJS() {
+        const container = document.getElementById('gyro-canvas');
+        const width = container.clientWidth;
+        const height = 250;
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2f3347);
+
+        camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        camera.position.set(3, 2, 4);
+        camera.lookAt(0, 0, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7);
+        scene.add(directionalLight);
+
+        bus = new THREE.Group();
+
+        const bodyGeometry = new THREE.BoxGeometry(3, 1.2, 1.5);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x89b4fa });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.6;
+        bus.add(body);
+
+        const windowGeometry = new THREE.BoxGeometry(2.8, 0.6, 1.4);
+        const windowMaterial = new THREE.MeshPhongMaterial({ color: 0x7aa2f7, opacity: 0.7, transparent: true });
+        const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
+        windowMesh.position.y = 1.5;
+        bus.add(windowMesh);
+
+        const wheelGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 16);
+        const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x6c7086 });
+
+        const wheel1 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel1.rotation.z = Math.PI / 2;
+        wheel1.position.set(-1, 0.1, 0.75);
+        bus.add(wheel1);
+
+        const wheel2 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel2.rotation.z = Math.PI / 2;
+        wheel2.position.set(1, 0.1, 0.75);
+        bus.add(wheel2);
+
+        const wheel3 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel3.rotation.z = Math.PI / 2;
+        wheel3.position.set(-1, 0.1, -0.75);
+        bus.add(wheel3);
+
+        const wheel4 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel4.rotation.z = Math.PI / 2;
+        wheel4.position.set(1, 0.1, -0.75);
+        bus.add(wheel4);
+
+        scene.add(bus);
+
+        animate();
     }
 
-    function updateAccel(accel) {
-        const x = accel.x || 0;
-        const y = accel.y || 0;
-        const z = accel.z || 0;
-        const magnitudeMs2 = Math.sqrt(x * x + y * y + z * z);
-        const magnitudeG = magnitudeMs2 / G;
-        document.getElementById('current-magnitude').textContent = magnitudeG.toFixed(3) + ' G (' + magnitudeMs2.toFixed(2) + ' m/s\u00B2)';
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+
+    function updateGyro(gyro) {
+        const x = (gyro.x || 0) * 0.01;
+        const y = (gyro.y || 0) * 0.01;
+        const z = (gyro.z || 0) * 0.01;
+
+        document.getElementById('gyro-x').textContent = (x * 57.3).toFixed(1) + '°';
+        document.getElementById('gyro-y').textContent = (y * 57.3).toFixed(1) + '°';
+        document.getElementById('gyro-z').textContent = (z * 57.3).toFixed(1) + '°';
+
+        if (bus) {
+            bus.rotation.x = x;
+            bus.rotation.y = y;
+            bus.rotation.z = z;
+        }
+    }
+
+    function updateAccelDisplay(d) {
+        document.getElementById('current-g').textContent = d.g.toFixed(3) + ' G';
+        document.getElementById('current-linear').textContent = d.magnitude.toFixed(2) + ' m/s²';
     }
 
     function updateGps(gps) {
         const lat = gps.latitude;
         const lon = gps.longitude;
-        document.getElementById('gps-lat').textContent = lat !== undefined ? lat.toFixed(6) : '\u2014';
-        document.getElementById('gps-lon').textContent = lon !== undefined ? lon.toFixed(6) : '\u2014';
+        document.getElementById('gps-lat').textContent = lat !== undefined ? lat.toFixed(6) : '—';
+        document.getElementById('gps-lon').textContent = lon !== undefined ? lon.toFixed(6) : '—';
         const link = document.getElementById('maps-link');
         if (lat !== undefined && lon !== undefined) {
             link.href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
@@ -175,7 +278,7 @@
         const svg = document.getElementById('chart');
         const now = Math.floor(Date.now() / 1000);
         const cutoff = now - (filterMinutes * 60);
-        const filtered = allData.filter(function(d) { return d.timestamp >= cutoff; });
+        const filtered = processedData.filter(function(d) { return d.timestamp >= cutoff; });
 
         const w = svg.clientWidth || 600;
         const h = 220;
@@ -193,12 +296,7 @@
 
         const minT = filtered[0].timestamp;
         const maxT = filtered[filtered.length - 1].timestamp;
-        const points = filtered.map(function(d) {
-            const a = d.accel;
-            const ms2 = Math.sqrt((a.x||0)*(a.x||0) + (a.y||0)*(a.y||0) + (a.z||0)*(a.z||0));
-            return { timestamp: d.timestamp, g: ms2 / G };
-        });
-        const maxG = Math.max.apply(null, points.map(function(p) { return p.g; })) * 1.15 || 1;
+        const maxG = Math.max.apply(null, filtered.map(function(p) { return p.g; })) * 1.15 || 1;
 
         let svgContent = '';
 
@@ -223,7 +321,7 @@
         }
 
         let path = '';
-        points.forEach(function(p, i) {
+        filtered.forEach(function(p, i) {
             const x = padL + ((p.timestamp - minT) / (maxT - minT || 1)) * plotW;
             const y = padT + plotH - (p.g / maxG) * plotH;
             path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
@@ -233,10 +331,12 @@
         svg.innerHTML = svgContent;
     }
 
-    if (allData.length > 0) {
-        const last = allData[allData.length - 1];
+    initThreeJS();
+
+    if (processedData.length > 0) {
+        const last = processedData[processedData.length - 1];
         updateGyro(last.gyro);
-        updateAccel(last.accel);
+        updateAccelDisplay(last);
         updateGps(last.gps);
     }
     drawChart();
@@ -257,15 +357,37 @@
         const msg = JSON.parse(event.data);
         if (msg.type !== 'telemetry') return;
 
-        allData.push({
+        const raw = msg.data.accelerometer || {};
+        const rx = raw.x || 0;
+        const ry = raw.y || 0;
+        const rz = raw.z || 0;
+
+        gravity.x = ALPHA * gravity.x + (1 - ALPHA) * rx;
+        gravity.y = ALPHA * gravity.y + (1 - ALPHA) * ry;
+        gravity.z = ALPHA * gravity.z + (1 - ALPHA) * rz;
+
+        const linear = {
+            x: rx - gravity.x,
+            y: ry - gravity.y,
+            z: rz - gravity.z
+        };
+
+        const magnitude = Math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z);
+        const g = magnitude / GRAVITY_EARTH;
+
+        const processed = {
             timestamp: msg.timestamp,
             gyro: msg.data.gyroscope || {},
-            accel: msg.data.accelerometer || {},
+            linear: linear,
+            magnitude: magnitude,
+            g: g,
             gps: msg.data.gps || {}
-        });
+        };
+
+        processedData.push(processed);
 
         updateGyro(msg.data.gyroscope || {});
-        updateAccel(msg.data.accelerometer || {});
+        updateAccelDisplay(processed);
         updateGps(msg.data.gps || {});
         drawChart();
     };
