@@ -26,7 +26,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
         await manager.broadcast_clients({
             "type": "client_update",
             "token": token,
-            "status": "active",
             "last_seen": client.last_seen.isoformat()
         })
 
@@ -63,19 +62,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
                     await manager.broadcast_clients({
                         "type": "client_update",
                         "token": token,
-                        "status": "active",
                         "last_seen": client.last_seen.isoformat()
                     })
 
                 await websocket.send_json({"status": "ok"})
 
         except WebSocketDisconnect:
-            await client_service.set_inactive(client.token)
-            await manager.broadcast_clients({
-                "type": "client_update",
-                "token": token,
-                "status": "inactive"
-            })
+            pass
 
 
 @router.websocket("/ws/ui/clients")

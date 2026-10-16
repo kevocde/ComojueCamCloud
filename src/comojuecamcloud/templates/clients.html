@@ -6,34 +6,37 @@
 {% if clients %}
 <div class="grid" id="clients-grid">
     {% for client in clients %}
-    <div class="card client-card {% if not client.is_active %}inactive{% endif %}" data-token="{{ client.token }}">
+    <div class="card client-card {% if not client.is_recently_active %}inactive{% endif %}" data-token="{{ client.token }}">
         <div class="card-header">
             <h3 class="card-title">{{ client.token }}</h3>
-            <span class="status-dot {% if client.is_active %}active{% else %}inactive-dot{% endif %}" title="{{ 'Online' if client.is_active else 'Offline' }}"></span>
+            <span class="status-dot {% if client.is_recently_active %}active{% else %}inactive-dot{% endif %}" title="{{ 'Active' if client.is_recently_active else 'Inactive' }}"></span>
         </div>
         <div class="card-meta">
             <div class="meta-row">
-                <span class="meta-label">Conectado</span>
+                <span class="meta-label">Creado</span>
                 <span class="meta-value">{{ client.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
             <div class="meta-row">
                 <span class="meta-label">Ultima vez</span>
                 <span class="meta-value last-seen">{{ client.last_seen.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
-            {% if not client.is_active %}
+            {% if not client.is_recently_active %}
             <div class="meta-row">
                 <span class="status-label">INACTIVO</span>
             </div>
             {% endif %}
         </div>
-        <a href="/clients/{{ client.token }}" style="display:inline-block;margin-top:1rem;font-size:0.9rem;">Ver telemetria</a>
+        <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+            <a href="/clients/{{ client.token }}" style="flex:1;text-align:center;">Ver telemetria</a>
+            <button class="delete-btn" data-token="{{ client.token }}" style="flex:0 0 auto;padding:0.3rem 0.8rem;background:var(--error);color:var(--bg);border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.8rem;">Eliminar</button>
+        </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
 <div class="empty-state">
     <h2>Sin clientes</h2>
-    <p>Los clientes conectados apareceran aqui automaticamente.</p>
+    <p>Los clientes que envien datos apareceran aqui automaticamente.</p>
 </div>
 {% endif %}
 
@@ -44,8 +47,14 @@
 
     ws.onmessage = function(event) {
         const msg = JSON.parse(event.data);
-        if (msg.type !== 'client_update') return;
+        if (msg.type === 'client_update') {
+            updateClientCard(msg);
+        } else if (msg.type === 'client_deleted') {
+            removeClientCard(msg.token);
+        }
+    };
 
+    function updateClientCard(msg) {
         const grid = document.getElementById('clients-grid');
         if (!grid) return;
 
@@ -55,7 +64,8 @@
             card = document.createElement('div');
             card.className = 'card client-card';
             card.setAttribute('data-token', msg.token);
-            card.innerHTML = '<div class="card-header"><h3 class="card-title">' + msg.token + '</h3><span class="status-dot active" title="Online"></span></div><div class="card-meta"><div class="meta-row"><span class="meta-label">Conectado</span><span class="meta-value">ahora</span></div><div class="meta-row"><span class="meta-label">Ultima vez</span><span class="meta-value last-seen">ahora</span></div></div><a href="/clients/' + msg.token + '" style="display:inline-block;margin-top:1rem;font-size:0.9rem;">Ver telemetria</a>';
+            card.innerHTML = '<div class="card-header"><h3 class="card-title">' + msg.token + '</h3><span class="status-dot active" title="Active"></span></div><div class="card-meta"><div class="meta-row"><span class="meta-label">Creado</span><span class="meta-value">ahora</span></div><div class="meta-row"><span class="meta-label">Ultima vez</span><span class="meta-value last-seen">ahora</span></div></div><div style="display:flex;gap:0.5rem;margin-top:1rem;"><a href="/clients/' + msg.token + '" style="flex:1;text-align:center;">Ver telemetria</a><button class="delete-btn" data-token="' + msg.token + '" style="flex:0 0 auto;padding:0.3rem 0.8rem;background:var(--error);color:var(--bg);border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.8rem;">Eliminar</button></div>';
+            attachDeleteHandler(card.querySelector('.delete-btn'));
             grid.insertBefore(card, grid.firstChild);
             return;
         }
@@ -63,27 +73,45 @@
         const dot = card.querySelector('.status-dot');
         const lastSeen = card.querySelector('.last-seen');
 
-        if (msg.status === 'active') {
-            card.classList.remove('inactive');
-            dot.classList.remove('inactive-dot');
-            dot.classList.add('active');
-            dot.title = 'Online';
-            if (lastSeen) lastSeen.textContent = 'ahora';
-            const statusRow = card.querySelector('.status-label');
-            if (statusRow) statusRow.parentElement.remove();
-        } else {
-            card.classList.add('inactive');
-            dot.classList.remove('active');
-            dot.classList.add('inactive-dot');
-            dot.title = 'Offline';
-            if (!card.querySelector('.status-label')) {
-                const row = document.createElement('div');
-                row.className = 'meta-row';
-                row.innerHTML = '<span class="status-label">INACTIVO</span>';
-                card.querySelector('.card-meta').appendChild(row);
+        card.classList.remove('inactive');
+        dot.classList.remove('inactive-dot');
+        dot.classList.add('active');
+        dot.title = 'Active';
+        if (lastSeen) lastSeen.textContent = 'ahora';
+        const statusRow = card.querySelector('.status-label');
+        if (statusRow) statusRow.parentElement.remove();
+    }
+
+    function removeClientCard(token) {
+        const card = document.querySelector('[data-token="' + token + '"]');
+        if (card) {
+            card.remove();
+            const grid = document.getElementById('clients-grid');
+            if (grid && grid.children.length === 0) {
+                location.reload();
             }
         }
-    };
+    }
+
+    function attachDeleteHandler(btn) {
+        btn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const token = btn.getAttribute('data-token');
+            if (!confirm('Eliminar cliente ' + token + '?')) return;
+
+            const response = await fetch('/clients/' + token, { method: 'DELETE' });
+            if (response.ok) {
+                const card = btn.closest('.client-card');
+                if (card) card.remove();
+                const grid = document.getElementById('clients-grid');
+                if (grid && grid.children.length === 0) {
+                    location.reload();
+                }
+            }
+        });
+    }
+
+    document.querySelectorAll('.delete-btn').forEach(attachDeleteHandler);
 
     ws.onclose = function() {
         setTimeout(function() { location.reload(); }, 3000);

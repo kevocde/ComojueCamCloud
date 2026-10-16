@@ -3,13 +3,14 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from comojuecamcloud.database import get_db
 from comojuecamcloud.services.client_service import ClientService
 from comojuecamcloud.services.telemetry_service import TelemetryService
+from comojuecamcloud.websocket_manager import manager
 
 router = APIRouter()
 templates_dir = Path(__file__).parent.parent / "templates"
@@ -24,6 +25,22 @@ async def list_clients(request: Request, db: AsyncSession = Depends(get_db)):
     template = env.get_template("clients.html")
     html = template.render(request=request, clients=clients)
     return HTMLResponse(content=html)
+
+
+@router.delete("/clients/{token}")
+async def delete_client(token: str, db: AsyncSession = Depends(get_db)):
+    client_service = ClientService(db)
+    success = await client_service.delete_client(token)
+
+    if not success:
+        return JSONResponse({"error": "Client not found"}, status_code=404)
+
+    await manager.broadcast_clients({
+        "type": "client_deleted",
+        "token": token
+    })
+
+    return JSONResponse({"status": "ok"})
 
 
 @router.get("/clients/{token}")

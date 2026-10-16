@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timedelta
 
 from comojuecamcloud.services.client_service import ClientService
 
@@ -29,7 +30,6 @@ async def test_get_or_create_new_client(db):
 
     assert client is not None
     assert client.token == "abc-xyz"
-    assert client.is_active is True
 
 
 @pytest.mark.asyncio
@@ -50,40 +50,40 @@ async def test_get_or_create_invalid_token(db):
 
 
 @pytest.mark.asyncio
-async def test_set_inactive(db):
-    service = ClientService(db)
-    client = await service.get_or_create("abc-xyz")
-    assert client.is_active is True
-
-    await service.set_inactive("abc-xyz")
-    client = await service.get_client("abc-xyz")
-    assert client.is_active is False
-
-
-@pytest.mark.asyncio
-async def test_get_active_clients(db):
+async def test_get_all_clients_with_time_based_active(db):
     service = ClientService(db)
     await service.get_or_create("abc-xyz")
     await service.get_or_create("def-uvw")
     await service.get_or_create("ghi-rst")
 
-    clients = await service.get_active_clients()
-    assert len(clients) == 3
-
-    await service.set_inactive("abc-xyz")
-    clients = await service.get_active_clients()
-    assert len(clients) == 2
-
-
-@pytest.mark.asyncio
-async def test_get_all_clients(db):
-    service = ClientService(db)
-    await service.get_or_create("abc-xyz")
-    await service.get_or_create("def-uvw")
-    await service.get_or_create("ghi-rst")
-    await service.set_inactive("def-uvw")
+    client = await service.get_client("def-uvw")
+    client.last_seen = datetime.utcnow() - timedelta(minutes=10)
+    await db.commit()
 
     clients = await service.get_all_clients()
     assert len(clients) == 3
-    assert all(c.is_active for c in clients[:2])
-    assert not clients[2].is_active
+
+    active_clients = [c for c in clients if c.is_recently_active]
+    assert len(active_clients) == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_client(db):
+    service = ClientService(db)
+    await service.get_or_create("abc-xyz")
+
+    client = await service.get_client("abc-xyz")
+    assert client is not None
+
+    result = await service.delete_client("abc-xyz")
+    assert result is True
+
+    client = await service.get_client("abc-xyz")
+    assert client is None
+
+
+@pytest.mark.asyncio
+async def test_delete_nonexistent_client(db):
+    service = ClientService(db)
+    result = await service.delete_client("nonexistent")
+    assert result is False

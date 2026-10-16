@@ -76,3 +76,24 @@ async def test_telemetry_detail_not_found(client: AsyncClient, test_db: async_se
     response = await client.get("/clients/abc-xyz/9999999999")
     assert response.status_code == 404
     assert "Telemetry data not found" in response.text
+
+
+@pytest.mark.asyncio
+async def test_delete_client(client: AsyncClient, test_db: async_sessionmaker):
+    async with test_db() as db:
+        client_service = ClientService(db)
+        await client_service.get_or_create("abc-xyz")
+
+    response = await client.delete("/clients/abc-xyz")
+    assert response.status_code == 200
+
+    async with test_db() as db:
+        client_service = ClientService(db)
+        client = await client_service.get_client("abc-xyz")
+        assert client is None
+
+
+@pytest.mark.asyncio
+async def test_delete_client_not_found(client: AsyncClient):
+    response = await client.delete("/clients/nonexistent")
+    assert response.status_code == 404

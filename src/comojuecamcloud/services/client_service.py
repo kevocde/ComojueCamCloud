@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, UTC
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import select
@@ -10,6 +10,7 @@ from comojuecamcloud.models.client import Client
 
 class ClientService:
     TOKEN_PATTERN = re.compile(r"^[a-zA-Z0-9]{3}-[a-zA-Z0-9]{3}$")
+    ACTIVE_THRESHOLD_MINUTES = 5
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -30,30 +31,38 @@ class ClientService:
             await self.db.commit()
             await self.db.refresh(client)
         else:
-            client.last_seen = datetime.now(UTC)
-            client.is_active = True
+            client.last_seen = datetime.utcnow()
             await self.db.commit()
             await self.db.refresh(client)
 
         return client
 
-    async def set_inactive(self, token: str):
-        result = await self.db.execute(select(Client).where(Client.token == token))
-        client = result.scalar_one_or_none()
-        if client:
-            client.is_active = False
-            await self.db.commit()
-
-    async def get_active_clients(self):
-        result = await self.db.execute(select(Client).where(Client.is_active == True))
-        return result.scalars().all()
-
     async def get_all_clients(self):
         result = await self.db.execute(
-            select(Client).order_by(Client.is_active.desc(), Client.last_seen.desc())
+            select(Client).order_by(Client.last_seen.desc())
         )
-        return result.scalars().all()
+        clients = result.scalars().all()
+        threshold = datetime.utcnow() - timedelta(minutes=self.ACTIVE_THRESHOLD_MINUTES)
+
+        for client in clients:
+            client.is_recently_active = client.last_seen >= threshold
+
+        return clients
 
     async def get_client(self, token: str) -> Optional[Client]:
         result = await self.db.execute(select(Client).where(Client.token == token))
-        return result.scalar_one_or_none()
+        client = result.scalar_one_or_none()
+        if client:
+            threshold = datetime.utcnow() - timedelta(minutes=self.ACTIVE_THRESHOLD_MINUTES)
+            client.is_recently_active = client.last_seen >= threshold
+        return client
+
+    async def delete_client(self, token: str) -> bool:
+        result = await self.db.execute(select(Client).where(Client.token == token))
+        client = result.scalar_one_or_none()
+        if not client:
+            return False
+
+        await self.db.delete(client)
+        await self.db.commit()
+        return True
