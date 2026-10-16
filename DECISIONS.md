@@ -52,11 +52,11 @@
   - Magnetómetro (heading compensado por tilt)
 - Fórmula: `orientation = 0.96 * gyro_integrated + 0.04 * accel/mag`
 - Display: Roll, Pitch, Yaw en grados
-- **Brújula SVG** con puntos cardinales (N/NE/E/SE/S/SW/W/NW)
-  - Rosa de los vientos rota según heading (yaw del magnetómetro)
-  - Indicador triangular fijo arriba marca la dirección actual
-  - Heading en grados + dirección cardinal (ej: "45° NE")
-  - N destacado en rojo, demás en colores muted
+- **Brújula 3D integrada** en la escena Three.js:
+  - Plataforma circular con anillo exterior
+  - Cono rojo para Norte, cajas grises para S/E/W
+  - Bus rota sobre la plataforma mostrando orientación relativa a cardinales
+- **Corrección landscape**: bus rotado 90° en Y para compensar orientación del celular
 
 ### GPS
 - Coordenadas lat/lon del último batch
