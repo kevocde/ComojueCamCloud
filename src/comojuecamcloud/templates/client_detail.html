@@ -39,6 +39,38 @@
                 <span class="meta-label" style="color:#5555ff;">Yaw</span>
                 <span class="meta-value" id="gyro-z">—</span>
             </div>
+            <div class="meta-row">
+                <span class="meta-label">Heading</span>
+                <span class="meta-value" id="heading-deg">—</span>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:1.5rem;">
+        <div id="compass-container" style="position:relative;width:180px;height:180px;">
+            <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid var(--accent);z-index:2;"></div>
+            <svg id="compass" viewBox="0 0 200 200" width="180" height="180" style="background:var(--surface-hover);border-radius:50%;border:2px solid var(--border);">
+                <circle cx="100" cy="100" r="85" fill="none" stroke="var(--border)" stroke-width="1"/>
+                <circle cx="100" cy="100" r="75" fill="none" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,4"/>
+                <g id="compass-rose">
+                    <text x="100" y="28" text-anchor="middle" fill="#f38ba8" font-size="16" font-weight="700" font-family="inherit">N</text>
+                    <text x="172" y="105" text-anchor="middle" fill="var(--fg)" font-size="16" font-weight="700" font-family="inherit">E</text>
+                    <text x="100" y="182" text-anchor="middle" fill="var(--fg)" font-size="16" font-weight="700" font-family="inherit">S</text>
+                    <text x="28" y="105" text-anchor="middle" fill="var(--fg)" font-size="16" font-weight="700" font-family="inherit">W</text>
+                    <text x="152" y="52" text-anchor="middle" fill="var(--fg-muted)" font-size="10" font-family="inherit">NE</text>
+                    <text x="152" y="158" text-anchor="middle" fill="var(--fg-muted)" font-size="10" font-family="inherit">SE</text>
+                    <text x="48" y="158" text-anchor="middle" fill="var(--fg-muted)" font-size="10" font-family="inherit">SW</text>
+                    <text x="48" y="52" text-anchor="middle" fill="var(--fg-muted)" font-size="10" font-family="inherit">NW</text>
+                    <line x1="100" y1="40" x2="100" y2="50" stroke="var(--fg)" stroke-width="1.5"/>
+                    <line x1="150" y1="100" x2="160" y2="100" stroke="var(--fg)" stroke-width="1.5"/>
+                    <line x1="100" y1="150" x2="100" y2="160" stroke="var(--fg)" stroke-width="1.5"/>
+                    <line x1="40" y1="100" x2="50" y2="100" stroke="var(--fg)" stroke-width="1.5"/>
+                    <line x1="135" y1="65" x2="140" y2="60" stroke="var(--fg-muted)" stroke-width="1"/>
+                    <line x1="135" y1="135" x2="140" y2="140" stroke="var(--fg-muted)" stroke-width="1"/>
+                    <line x1="65" y1="135" x2="60" y2="140" stroke="var(--fg-muted)" stroke-width="1"/>
+                    <line x1="65" y1="65" x2="60" y2="60" stroke="var(--fg-muted)" stroke-width="1"/>
+                </g>
+                <circle cx="100" cy="100" r="4" fill="var(--accent)"/>
+            </svg>
         </div>
     </div>
 </div>
@@ -308,6 +340,23 @@
         document.getElementById('gyro-x').textContent = rollDeg.toFixed(1) + '\u00B0';
         document.getElementById('gyro-y').textContent = pitchDeg.toFixed(1) + '\u00B0';
         document.getElementById('gyro-z').textContent = yawDeg.toFixed(1) + '\u00B0';
+
+        let heading = ((-yawDeg % 360) + 360) % 360;
+        document.getElementById('heading-deg').textContent = heading.toFixed(0) + '\u00B0';
+
+        const cardinal = heading < 22.5 || heading >= 337.5 ? 'N' :
+                         heading < 67.5 ? 'NE' :
+                         heading < 112.5 ? 'E' :
+                         heading < 157.5 ? 'SE' :
+                         heading < 202.5 ? 'S' :
+                         heading < 247.5 ? 'SW' :
+                         heading < 292.5 ? 'W' : 'NW';
+        document.getElementById('heading-deg').textContent = heading.toFixed(0) + '\u00B0 ' + cardinal;
+
+        const compassRose = document.getElementById('compass-rose');
+        if (compassRose) {
+            compassRose.setAttribute('transform', 'rotate(' + (-heading) + ', 100, 100)');
+        }
 
         if (bus) {
             bus.rotation.x = orientation.roll;
