@@ -48,6 +48,12 @@ class ClientService:
         result = await self.db.execute(select(Client).where(Client.is_active == True))
         return result.scalars().all()
 
+    async def get_all_clients(self):
+        result = await self.db.execute(
+            select(Client).order_by(Client.is_active.desc(), Client.last_seen.desc())
+        )
+        return result.scalars().all()
+
     async def get_client(self, token: str) -> Optional[Client]:
         result = await self.db.execute(select(Client).where(Client.token == token))
         return result.scalar_one_or_none()

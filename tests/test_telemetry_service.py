@@ -78,3 +78,24 @@ async def test_get_telemetry_data(db):
     categories = {d.category for d in telemetry_data}
     assert "gyroscope" in categories
     assert "accelerometer" in categories
+
+
+@pytest.mark.asyncio
+async def test_get_batches_with_data(db):
+    client_service = ClientService(db)
+    telemetry_service = TelemetryService(db)
+
+    await client_service.get_or_create("abc-xyz")
+    data = {
+        "gyroscope": {"x": 1.5, "y": 2.3, "z": 3.7},
+        "accelerometer": {"x": 0.1, "y": 0.2, "z": 9.8}
+    }
+    await telemetry_service.save_batch("abc-xyz", 1697456789, data)
+
+    batches = await telemetry_service.get_batches_with_data("abc-xyz")
+
+    assert len(batches) == 1
+    batch = batches[0]
+    assert batch["timestamp"] == 1697456789
+    assert "gyroscope" in batch["data"]
+    assert batch["data"]["gyroscope"]["x"] == 1.5

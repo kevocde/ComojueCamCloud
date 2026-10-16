@@ -73,3 +73,17 @@ async def test_get_active_clients(db):
     await service.set_inactive("abc-xyz")
     clients = await service.get_active_clients()
     assert len(clients) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_all_clients(db):
+    service = ClientService(db)
+    await service.get_or_create("abc-xyz")
+    await service.get_or_create("def-uvw")
+    await service.get_or_create("ghi-rst")
+    await service.set_inactive("def-uvw")
+
+    clients = await service.get_all_clients()
+    assert len(clients) == 3
+    assert all(c.is_active for c in clients[:2])
+    assert not clients[2].is_active
