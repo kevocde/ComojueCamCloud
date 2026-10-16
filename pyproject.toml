@@ -7,7 +7,19 @@ authors = [
     { name = "kevocde", email = "kevocde@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi>=0.143.2",
+    "greenlet>=3.5.6",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.1.4",
+    "uvicorn[standard]>=0.54.0",
+    "websockets>=17.2",
+]
 
 [project.scripts]
 comojuecamcloud = "comojuecamcloud:main"
@@ -15,6 +27,10 @@ comojuecamcloud = "comojuecamcloud:main"
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["src"]
 
 [tool.uv.workspace]
 members = [
