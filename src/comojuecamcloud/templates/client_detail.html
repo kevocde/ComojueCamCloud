@@ -274,6 +274,48 @@
         }
     }
 
+    function interpolateData(filtered, targetPoints) {
+        if (filtered.length >= targetPoints) return filtered;
+        if (filtered.length < 2) return filtered;
+
+        const result = [];
+        const startT = filtered[0].timestamp;
+        const endT = filtered[filtered.length - 1].timestamp;
+        const step = (endT - startT) / (targetPoints - 1);
+
+        for (let i = 0; i < targetPoints; i++) {
+            const t = startT + (i * step);
+            
+            let lower = filtered[0];
+            let upper = filtered[filtered.length - 1];
+            
+            for (let j = 0; j < filtered.length - 1; j++) {
+                if (filtered[j].timestamp <= t && filtered[j + 1].timestamp >= t) {
+                    lower = filtered[j];
+                    upper = filtered[j + 1];
+                    break;
+                }
+            }
+
+            const range = upper.timestamp - lower.timestamp;
+            const factor = range > 0 ? (t - lower.timestamp) / range : 0;
+
+            const g = lower.g + (upper.g - lower.g) * factor;
+            const magnitude = lower.magnitude + (upper.magnitude - lower.magnitude) * factor;
+
+            result.push({
+                timestamp: t,
+                g: g,
+                magnitude: magnitude,
+                gyro: lower.gyro,
+                linear: lower.linear,
+                gps: lower.gps
+            });
+        }
+
+        return result;
+    }
+
     function drawChart() {
         const svg = document.getElementById('chart');
         const maxTimestamp = processedData.length > 0 ? processedData[processedData.length - 1].timestamp : Math.floor(Date.now() / 1000);
@@ -294,9 +336,11 @@
             return;
         }
 
-        const minT = filtered[0].timestamp;
-        const maxT = filtered[filtered.length - 1].timestamp;
-        const maxG = Math.max.apply(null, filtered.map(function(p) { return p.g; })) * 1.15 || 1;
+        const displayData = interpolateData(filtered, 20);
+
+        const minT = displayData[0].timestamp;
+        const maxT = displayData[displayData.length - 1].timestamp;
+        const maxG = Math.max.apply(null, displayData.map(function(p) { return p.g; })) * 1.1 || 0.1;
 
         let svgContent = '';
 
@@ -312,16 +356,16 @@
         }
         svgContent += '<text x="' + (padL - 6) + '" y="' + (padT - 4) + '" text-anchor="end" fill="var(--fg-muted)" font-size="0.65rem">Gs</text>';
 
-        const xLabelCount = Math.min(5, filtered.length);
+        const xLabelCount = Math.min(5, displayData.length);
         for (var j = 0; j < xLabelCount; j++) {
-            const idx = Math.floor((j / (xLabelCount - 1)) * (filtered.length - 1));
-            const xPos = padL + ((filtered[idx].timestamp - minT) / (maxT - minT || 1)) * plotW;
+            const idx = Math.floor((j / (xLabelCount - 1)) * (displayData.length - 1));
+            const xPos = padL + ((displayData[idx].timestamp - minT) / (maxT - minT || 1)) * plotW;
             svgContent += '<line x1="' + xPos + '" y1="' + (padT + plotH) + '" x2="' + xPos + '" y2="' + (padT + plotH + 4) + '" stroke="var(--border)" stroke-width="1"/>';
-            svgContent += '<text x="' + xPos + '" y="' + (padT + plotH + 16) + '" text-anchor="middle" fill="var(--fg-muted)" font-size="0.7rem">' + formatTime(filtered[idx].timestamp) + '</text>';
+            svgContent += '<text x="' + xPos + '" y="' + (padT + plotH + 16) + '" text-anchor="middle" fill="var(--fg-muted)" font-size="0.7rem">' + formatTime(displayData[idx].timestamp) + '</text>';
         }
 
         let path = '';
-        filtered.forEach(function(p, i) {
+        displayData.forEach(function(p, i) {
             const x = padL + ((p.timestamp - minT) / (maxT - minT || 1)) * plotW;
             const y = padT + plotH - (p.g / maxG) * plotH;
             path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
