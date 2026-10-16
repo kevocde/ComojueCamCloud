@@ -28,15 +28,15 @@
         </div>
         <div style="min-width:150px;">
             <div class="meta-row">
-                <span class="meta-label" style="color:#ff5555;">Rotación X</span>
+                <span class="meta-label" style="color:#ff5555;">Roll</span>
                 <span class="meta-value" id="gyro-x">—</span>
             </div>
             <div class="meta-row">
-                <span class="meta-label" style="color:#55ff55;">Rotación Y</span>
+                <span class="meta-label" style="color:#55ff55;">Pitch</span>
                 <span class="meta-value" id="gyro-y">—</span>
             </div>
             <div class="meta-row">
-                <span class="meta-label" style="color:#5555ff;">Rotación Z</span>
+                <span class="meta-label" style="color:#5555ff;">Yaw</span>
                 <span class="meta-value" id="gyro-z">—</span>
             </div>
         </div>
@@ -101,6 +101,7 @@
 (function() {
     const GRAVITY_EARTH = 9.80665;
     const ALPHA = 0.8;
+    const FUSION_ALPHA = 0.96;
     const batchData = {{ batch_data | tojson }};
     const rawData = [];
 
@@ -109,6 +110,7 @@
             timestamp: batch.timestamp,
             gyro: batch.data.gyroscope || {},
             accel: batch.data.accelerometer || {},
+            mag: batch.data.magnetometer || {},
             gps: batch.data.gps || {}
         });
     });
@@ -117,6 +119,31 @@
     const processedData = [];
     let gravity = { x: 0, y: 0, z: 0 };
     let gravityInitialized = false;
+    let orientation = { roll: 0, pitch: 0, yaw: 0 };
+    let lastTimestamp = null;
+
+    function calcAccelOrientation(accel) {
+        const ax = accel.x || 0;
+        const ay = accel.y || 0;
+        const az = accel.z || 0;
+        const roll = Math.atan2(ay, Math.sqrt(ax * ax + az * az));
+        const pitch = Math.atan2(-ax, Math.sqrt(ay * ay + az * az));
+        return { roll: roll, pitch: pitch };
+    }
+
+    function calcMagHeading(mag, roll, pitch) {
+        const mx = mag.x || 0;
+        const my = mag.y || 0;
+        const mz = mag.z || 0;
+        const cosRoll = Math.cos(roll);
+        const sinRoll = Math.sin(roll);
+        const cosPitch = Math.cos(pitch);
+        const sinPitch = Math.sin(pitch);
+        const Mx = mx * cosPitch + mz * sinPitch;
+        const My = mx * sinRoll * sinPitch + my * cosRoll - mz * sinRoll * cosPitch;
+        const heading = Math.atan2(-My, Mx);
+        return heading;
+    }
 
     rawData.forEach(function(d) {
         const raw = d.accel;
@@ -129,12 +156,20 @@
             gravity.y = ry;
             gravity.z = rz;
             gravityInitialized = true;
+            const accelOrient = calcAccelOrientation(raw);
+            orientation.roll = accelOrient.roll;
+            orientation.pitch = accelOrient.pitch;
+            if (d.mag.x !== undefined) {
+                orientation.yaw = calcMagHeading(d.mag, orientation.roll, orientation.pitch);
+            }
+            lastTimestamp = d.timestamp;
             processedData.push({
                 timestamp: d.timestamp,
                 gyro: d.gyro,
                 linear: { x: 0, y: 0, z: 0 },
                 magnitude: 0,
                 g: 0,
+                orientation: { roll: orientation.roll, pitch: orientation.pitch, yaw: orientation.yaw },
                 gps: d.gps
             });
             return;
@@ -153,12 +188,35 @@
         const magnitude = Math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z);
         const g = magnitude / GRAVITY_EARTH;
 
+        const dt = (d.timestamp - lastTimestamp) || 1;
+        lastTimestamp = d.timestamp;
+
+        const gyroRad = {
+            x: (d.gyro.x || 0) * Math.PI / 180,
+            y: (d.gyro.y || 0) * Math.PI / 180,
+            z: (d.gyro.z || 0) * Math.PI / 180
+        };
+
+        const gyroIntegrated = {
+            roll: orientation.roll + gyroRad.x * dt,
+            pitch: orientation.pitch + gyroRad.y * dt,
+            yaw: orientation.yaw + gyroRad.z * dt
+        };
+
+        const accelOrient = calcAccelOrientation(raw);
+        const magYaw = calcMagHeading(d.mag, accelOrient.roll, accelOrient.pitch);
+
+        orientation.roll = FUSION_ALPHA * gyroIntegrated.roll + (1 - FUSION_ALPHA) * accelOrient.roll;
+        orientation.pitch = FUSION_ALPHA * gyroIntegrated.pitch + (1 - FUSION_ALPHA) * accelOrient.pitch;
+        orientation.yaw = FUSION_ALPHA * gyroIntegrated.yaw + (1 - FUSION_ALPHA) * magYaw;
+
         processedData.push({
             timestamp: d.timestamp,
             gyro: d.gyro,
             linear: linear,
             magnitude: magnitude,
             g: g,
+            orientation: { roll: orientation.roll, pitch: orientation.pitch, yaw: orientation.yaw },
             gps: d.gps
         });
     });
@@ -242,19 +300,19 @@
         renderer.render(scene, camera);
     }
 
-    function updateGyro(gyro) {
-        const x = (gyro.x || 0) * 0.01;
-        const y = (gyro.y || 0) * 0.01;
-        const z = (gyro.z || 0) * 0.01;
+    function updateGyro(orientation) {
+        const rollDeg = (orientation.roll * 180 / Math.PI);
+        const pitchDeg = (orientation.pitch * 180 / Math.PI);
+        const yawDeg = (orientation.yaw * 180 / Math.PI);
 
-        document.getElementById('gyro-x').textContent = (x * 57.3).toFixed(1) + '°';
-        document.getElementById('gyro-y').textContent = (y * 57.3).toFixed(1) + '°';
-        document.getElementById('gyro-z').textContent = (z * 57.3).toFixed(1) + '°';
+        document.getElementById('gyro-x').textContent = rollDeg.toFixed(1) + '\u00B0';
+        document.getElementById('gyro-y').textContent = pitchDeg.toFixed(1) + '\u00B0';
+        document.getElementById('gyro-z').textContent = yawDeg.toFixed(1) + '\u00B0';
 
         if (bus) {
-            bus.rotation.x = x;
-            bus.rotation.y = y;
-            bus.rotation.z = z;
+            bus.rotation.x = orientation.roll;
+            bus.rotation.y = orientation.pitch;
+            bus.rotation.z = orientation.yaw;
         }
     }
 
@@ -379,7 +437,7 @@
 
     if (processedData.length > 0) {
         const last = processedData[processedData.length - 1];
-        updateGyro(last.gyro);
+        updateGyro(last.orientation);
         updateAccelDisplay(last);
         updateGps(last.gps);
     }
@@ -419,18 +477,42 @@
         const magnitude = Math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z);
         const g = magnitude / GRAVITY_EARTH;
 
+        const dt = (msg.timestamp - lastTimestamp) || 1;
+        lastTimestamp = msg.timestamp;
+
+        const gyroRad = {
+            x: ((msg.data.gyroscope || {}).x || 0) * Math.PI / 180,
+            y: ((msg.data.gyroscope || {}).y || 0) * Math.PI / 180,
+            z: ((msg.data.gyroscope || {}).z || 0) * Math.PI / 180
+        };
+
+        const gyroIntegrated = {
+            roll: orientation.roll + gyroRad.x * dt,
+            pitch: orientation.pitch + gyroRad.y * dt,
+            yaw: orientation.yaw + gyroRad.z * dt
+        };
+
+        const accelOrient = calcAccelOrientation(raw);
+        const magData = msg.data.magnetometer || {};
+        const magYaw = calcMagHeading(magData, accelOrient.roll, accelOrient.pitch);
+
+        orientation.roll = FUSION_ALPHA * gyroIntegrated.roll + (1 - FUSION_ALPHA) * accelOrient.roll;
+        orientation.pitch = FUSION_ALPHA * gyroIntegrated.pitch + (1 - FUSION_ALPHA) * accelOrient.pitch;
+        orientation.yaw = FUSION_ALPHA * gyroIntegrated.yaw + (1 - FUSION_ALPHA) * magYaw;
+
         const processed = {
             timestamp: msg.timestamp,
             gyro: msg.data.gyroscope || {},
             linear: linear,
             magnitude: magnitude,
             g: g,
+            orientation: { roll: orientation.roll, pitch: orientation.pitch, yaw: orientation.yaw },
             gps: msg.data.gps || {}
         };
 
         processedData.push(processed);
 
-        updateGyro(msg.data.gyroscope || {});
+        updateGyro(processed.orientation);
         updateAccelDisplay(processed);
         updateGps(msg.data.gps || {});
         drawChart();
