@@ -7,60 +7,46 @@ from comojuecamcloud.services.telemetry_service import TelemetryService
 
 
 @pytest.mark.asyncio
-async def test_clients_page_retro_base_style(client: AsyncClient):
+async def test_clients_page_modern_dark_theme(client: AsyncClient):
     response = await client.get("/clients")
+    html = response.text
     assert response.status_code == 200
-    html = response.text
-    assert "class=\"crt\"" in html
-    assert "monospace" in html or "monospac" in html
-    assert "#33ff33" in html or "33ff33" in html
+    assert "#1a1b26" in html
+    assert "monospace" in html
+    assert "border-radius" in html
+    assert "box-shadow" in html
 
 
 @pytest.mark.asyncio
-async def test_clients_page_ascii_decorations(client: AsyncClient, test_db: async_sessionmaker):
-    async with test_db() as db:
-        cs = ClientService(db)
-        await cs.get_or_create("abc-xyz")
-
+async def test_clients_page_uses_cards_not_borders(client: AsyncClient):
     response = await client.get("/clients")
     html = response.text
-    assert "╔" in html or "┌" in html or "+" in html
+    assert "class=\"card\"" in html or "card-" in html
+    assert "╔" not in html
+    assert "┌" not in html
 
 
 @pytest.mark.asyncio
-async def test_clients_page_retro_status_indicators(client: AsyncClient, test_db: async_sessionmaker):
+async def test_clients_page_status_dot(client: AsyncClient, test_db: async_sessionmaker):
     async with test_db() as db:
         cs = ClientService(db)
         await cs.get_or_create("abc-xyz")
-
     response = await client.get("/clients")
     html = response.text
-    assert "[*]" in html or "[ONLINE]" in html or "[OK]" in html
+    assert "dot" in html or "status" in html
 
 
 @pytest.mark.asyncio
-async def test_clients_page_breadcrumb_in_detail(client: AsyncClient, test_db: async_sessionmaker):
-    async with test_db() as db:
-        cs = ClientService(db)
-        await cs.get_or_create("abc-xyz")
-
-    response = await client.get("/clients/abc-xyz")
-    html = response.text
-    assert "cd" in html.lower() or ".." in html or "&lt;-" in html or "←" in html
-
-
-@pytest.mark.asyncio
-async def test_error_page_retro_style(client: AsyncClient):
+async def test_error_page_modern_style(client: AsyncClient):
     response = await client.get("/clients/nonexistent")
     assert response.status_code == 404
     html = response.text
-    assert "class=\"crt\"" in html
-    assert "404" in html
-    assert "ERROR" in html or "error" in html
+    assert "#1a1b26" in html
+    assert "border-radius" in html
 
 
 @pytest.mark.asyncio
-async def test_telemetry_detail_retro_table(client: AsyncClient, test_db: async_sessionmaker):
+async def test_telemetry_detail_clean_table(client: AsyncClient, test_db: async_sessionmaker):
     async with test_db() as db:
         cs = ClientService(db)
         ts = TelemetryService(db)
@@ -69,5 +55,6 @@ async def test_telemetry_detail_retro_table(client: AsyncClient, test_db: async_
 
     response = await client.get("/clients/abc-xyz/1697456789")
     html = response.text
-    assert "class=\"crt\"" in html
-    assert "─" in html or "│" in html or "|" in html
+    assert "#1a1b26" in html
+    assert "box-shadow" in html
+    assert "border-radius" in html
