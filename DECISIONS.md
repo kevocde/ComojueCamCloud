@@ -51,7 +51,15 @@
   - Acelerómetro (roll/pitch derivado de gravedad)
   - Magnetómetro (heading compensado por tilt)
 - Fórmula: `orientation = 0.96 * gyro_integrated + 0.04 * accel/mag`
-- Display: Roll, Pitch, Yaw en grados
+- **Ajuste de roll**: `pitch_adjusted = 90 - roll_deg` para representar inclinación correcta
+  - 0° = nivel, negativo = apunta hacia abajo, positivo = apunta hacia arriba
+- **Indicador de horizonte artificial**:
+  - SVG circular dividido en cielo (azul) y suelo (marrón)
+  - Línea del horizonte con marca central
+  - Rotación basada en pitch_adjusted (clamped a ±45°)
+  - Marca de referencia fija (triángulo) indicando el punto de vista
+  - Display de inclinación en grados debajo del indicador
+- Display de Roll, Pitch, Yaw, Heading en grid responsive
 - **Brújula 3D integrada** en la escena Three.js:
   - Plataforma circular con anillo exterior
   - Cono rojo para Norte, cajas grises para S/E/W
