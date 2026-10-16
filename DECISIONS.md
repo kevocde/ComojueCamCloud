@@ -52,6 +52,11 @@
   - Magnetómetro (heading compensado por tilt)
 - Fórmula: `orientation = 0.96 * gyro_integrated + 0.04 * accel/mag`
 - Display: Roll, Pitch, Yaw en grados
+- **Brújula SVG** con puntos cardinales (N/NE/E/SE/S/SW/W/NW)
+  - Rosa de los vientos rota según heading (yaw del magnetómetro)
+  - Indicador triangular fijo arriba marca la dirección actual
+  - Heading en grados + dirección cardinal (ej: "45° NE")
+  - N destacado en rojo, demás en colores muted
 
 ### GPS
 - Coordenadas lat/lon del último batch
