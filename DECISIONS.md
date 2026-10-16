@@ -74,6 +74,12 @@
 - `magnetometer`: {x, y, z} — campo magnético (µT)
 - `gps`: {latitude, longitude}
 
+### Correcciones de flujo
+- Commits de UI hechos inicialmente en main directamente (incorrecto)
+- Movidos a rama `feature/ui-improvements` para seguir workflow correcto
+- Main reseteado a `e73a547` (merge PR #3)
+- PR pendiente para merge a main
+
 ---
 
 ## Notas técnicas
@@ -88,5 +94,6 @@
 
 ### Workflow
 - Commits progresivos con TDD (tests primero)
-- Ramas: `feature/retro-ui`, `feature/live-ui`
+- Ramas: `feature/retro-ui`, `feature/live-ui`, `feature/ui-improvements`
 - Push inmediato tras cada cambio
+- NUNCA merge directo a main, siempre usar PR
