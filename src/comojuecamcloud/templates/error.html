@@ -1,11 +1,9 @@
 {% extends "base.html" %}
-{% block title %}ERROR 404 - ComojueCamCloud{% endblock %}
+{% block title %}Error - ComojueCamCloud{% endblock %}
 {% block content %}
-<div class="error-box">
-    <h1>ERROR 404</h1>
-    <p>:: {{ error }} ::</p>
-    <div class="sep">══════════════════════════════════════════</div>
-    <br>
-    <a href="/clients">&gt; volver a clientes</a>
+<div class="error-container">
+    <div class="error-code">404</div>
+    <div class="error-message">{{ error }}</div>
+    <a href="/clients">Volver a clientes</a>
 </div>
 {% endblock %}

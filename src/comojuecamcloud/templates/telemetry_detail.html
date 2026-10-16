@@ -2,36 +2,47 @@
 {% block title %}Telemetria {{ timestamp }} - ComojueCamCloud{% endblock %}
 {% block content %}
 <div class="breadcrumb">
-    <a href="/clients">&lt;- clientes</a> <span class="sep">/</span>
-    <a href="/clients/{{ token }}">cliente {{ token }}</a>
+    <a href="/clients">Clientes</a>
+    <span>›</span>
+    <a href="/clients/{{ token }}">{{ token }}</a>
+    <span>›</span>
+    {{ timestamp }}
 </div>
 
-<h1>:: DATOS DE TELEMETRIA</h1>
+<h1>Telemetria</h1>
 
-<div class="telemetry-info">
-    <p>timestamp: <span>{{ timestamp }}</span></p>
-    <p>fecha/hora: <span>{{ datetime.strftime('%Y-%m-%d %H:%M:%S') }}</span></p>
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="meta-row">
+        <span class="meta-label">Timestamp</span>
+        <span class="meta-value">{{ timestamp }}</span>
+    </div>
+    <div class="meta-row">
+        <span class="meta-label">Fecha/Hora</span>
+        <span class="meta-value">{{ datetime.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+    </div>
 </div>
 
 {% if data_by_category %}
-<div class="category-grid">
+<div class="grid">
     {% for category, values in data_by_category.items() %}
-    <div class="box">
-        <div class="box-header">┌─ {{ category }} ─────────────────┐</div>
-        <table class="data-table">
-            {% for key, value in values.items() %}
-            <tr>
-                <th>{{ key }}</th>
-                <td>{{ "%.4f"|format(value) if value is number else value }}</td>
-            </tr>
-            {% endfor %}
+    <div class="card">
+        <h3 class="card-title">{{ category }}</h3>
+        <table>
+            <tbody>
+                {% for key, value in values.items() %}
+                <tr>
+                    <td style="color:var(--fg-muted);font-size:0.85rem;">{{ key }}</td>
+                    <td>{{ "%.4f"|format(value) if value is number else value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="empty">
-    <p>:: no hay datos disponibles para este timestamp ::</p>
+<div class="empty-state">
+    <p>Sin datos para este timestamp.</p>
 </div>
 {% endif %}
 {% endblock %}

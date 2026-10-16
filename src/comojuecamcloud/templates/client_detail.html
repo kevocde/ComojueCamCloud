@@ -1,33 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Cliente {{ client.token }} - ComojueCamCloud{% endblock %}
+{% block title %}{{ client.token }} - ComojueCamCloud{% endblock %}
 {% block content %}
 <div class="breadcrumb">
-    <a href="/clients">&lt;- clientes</a>
+    <a href="/clients">Clientes</a>
+    <span>›</span>
+    {{ client.token }}
 </div>
 
-<h1>:: CLIENTE {{ client.token }}</h1>
+<h1>{{ client.token }}</h1>
 
-<div class="telemetry-info">
-    <p>creado: <span>{{ client.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span></p>
-    <p>ultimo: <span>{{ client.last_seen.strftime('%Y-%m-%d %H:%M:%S') }}</span></p>
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="meta-row">
+        <span class="meta-label">Conectado</span>
+        <span class="meta-value">{{ client.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+    </div>
+    <div class="meta-row">
+        <span class="meta-label">Ultima vez</span>
+        <span class="meta-value">{{ client.last_seen.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+    </div>
 </div>
 
-<div class="box-header">BATCHES DE TELEMETRIA <span class="sep">────────────────────────</span></div>
+<h2>Batches de telemetria</h2>
 
 {% if batches %}
-<div class="batch-list">
+<div class="grid">
     {% for batch in batches %}
-    <div class="batch-item">
-        <a href="/clients/{{ client.token }}/{{ batch.timestamp }}">
-            <span class="batch-time">&gt; {{ batch.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+    <div class="card">
+        <a href="/clients/{{ client.token }}/{{ batch.timestamp }}" style="text-decoration:none;color:var(--fg);">
+            <h3 class="card-title">{{ batch.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h3>
+            <div class="card-meta">
+                <span class="meta-label">Timestamp</span>
+                <span class="meta-value">{{ batch.timestamp }}</span>
+            </div>
         </a>
-        <span class="box-label">ts: {{ batch.timestamp }}</span>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="empty">
-    <p>:: no hay datos de telemetria para este cliente ::</p>
+<div class="empty-state">
+    <p>Sin datos de telemetria para este cliente.</p>
 </div>
 {% endif %}
 {% endblock %}

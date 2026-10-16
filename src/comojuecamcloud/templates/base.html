@@ -6,324 +6,235 @@
     <title>{% block title %}ComojueCamCloud{% endblock %}</title>
     <style>
         :root {
-            --fg: #33ff33;
-            --fg-dim: #1a7a1a;
-            --fg-bright: #66ff66;
-            --accent: #66ffff;
-            --bg: #001100;
-            --bg-card: #002200;
-            --border: #33ff33;
+            --bg: #1a1b26;
+            --surface: #24283b;
+            --surface-hover: #2f3347;
+            --fg: #cdd6f4;
+            --fg-muted: #6c7086;
+            --accent: #89b4fa;
+            --accent-hover: #7aa2f7;
+            --success: #a6e3a1;
+            --warning: #f9e2af;
+            --error: #f38ba8;
+            --border: #313244;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
-            font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Consolas, 'Liberation Mono', monospace;
+            font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
             background-color: var(--bg);
             color: var(--fg);
-            padding: 1.5em;
+            padding: 2rem;
             line-height: 1.6;
-            font-size: 14px;
+            font-size: 0.95rem;
         }
 
-        .crt { max-width: 120ch; margin: 0 auto; }
-
-        a {
-            color: var(--accent);
-            text-decoration: underline;
-            text-underline-offset: 3px;
-        }
-
-        a:hover, a:focus {
-            background-color: var(--fg);
-            color: var(--bg);
-            outline: 2px solid var(--fg);
-            outline-offset: 2px;
+        .container {
+            max-width: 90ch;
+            margin: 0 auto;
         }
 
         h1, h2, h3 {
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--fg-bright);
             font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
         }
 
-        h1 {
-            font-size: 1.6em;
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 0.4em;
-            margin-bottom: 1em;
+        h1 { font-size: 2rem; }
+        h2 { font-size: 1.5rem; }
+        h3 { font-size: 1.25rem; }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color 0.15s ease;
         }
 
-        h2 {
-            font-size: 1.2em;
-            margin-bottom: 0.6em;
-        }
-
-        h3 {
-            font-size: 1em;
-            margin-bottom: 0.5em;
-            color: var(--fg);
-        }
-
-        .banner {
-            text-align: center;
-            margin-bottom: 1.5em;
-            color: var(--fg-bright);
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            white-space: pre;
-            line-height: 1.2;
-        }
-
-        .cursor {
-            animation: blink 1s step-start infinite;
-            color: var(--fg-bright);
-        }
-
-        @keyframes blink {
-            50% { opacity: 0; }
-        }
-
-        .breadcrumb {
-            margin-bottom: 1em;
-            color: var(--fg-dim);
-            font-size: 0.9em;
-        }
-
-        .breadcrumb a {
-            color: var(--fg-dim);
+        a:hover {
+            color: var(--accent-hover);
             text-decoration: underline;
         }
 
+        .breadcrumb {
+            color: var(--fg-muted);
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .breadcrumb a {
+            color: var(--fg-muted);
+        }
+
         .breadcrumb a:hover {
-            color: var(--bg);
-            background-color: var(--fg-dim);
+            color: var(--accent);
         }
 
-        .prompt {
-            color: var(--fg-bright);
-            font-weight: 700;
+        .breadcrumb span {
+            margin: 0 0.5rem;
+            color: var(--border);
         }
 
-        .box {
-            border: 2px solid var(--border);
-            padding: 1em;
-            margin-bottom: 1em;
-            background-color: var(--bg-card);
-            position: relative;
+        .card {
+            background-color: var(--surface);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
 
-        .box-header {
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            font-size: 0.85em;
-            color: var(--fg-bright);
-            margin-bottom: 0.6em;
-            font-weight: 700;
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
         }
 
-        .box-label {
-            color: var(--fg-dim);
-            font-size: 0.85em;
-        }
-
-        .box:hover {
-            border-color: var(--fg-bright);
-        }
-
-        .client-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.8em;
-        }
-
-        .client-entry {
-            border: 1px solid var(--border);
-            padding: 0.8em 1em;
-            display: flex;
-            align-items: baseline;
-            gap: 1em;
-            flex-wrap: wrap;
-            background-color: var(--bg-card);
-        }
-
-        .client-entry:hover {
-            background-color: var(--fg);
-            color: var(--bg);
-            border-color: var(--fg);
-        }
-
-        .client-entry:hover a {
-            color: var(--bg);
-        }
-
-        .client-entry:hover .box-label {
-            color: var(--bg);
-        }
-
-        .token {
-            font-weight: 700;
-            color: var(--fg-bright);
-            font-size: 1.1em;
-            letter-spacing: 0.08em;
-        }
-
-        .client-entry:hover .token {
-            color: var(--bg);
-        }
-
-        .meta {
-            font-style: italic;
-            color: var(--fg-dim);
-            font-size: 0.85em;
-        }
-
-        .client-entry:hover .meta {
-            color: var(--bg);
-        }
-
-        .status-on {
-            color: var(--fg-bright);
-            font-weight: 700;
-        }
-
-        .client-entry:hover .status-on {
-            color: var(--bg);
-        }
-
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0.5em 0;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding: 0.4em 1em;
-            text-align: left;
-            border-bottom: 1px solid var(--fg-dim);
-        }
-
-        .data-table th {
-            color: var(--fg-dim);
-            font-size: 0.85em;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            font-weight: 400;
-        }
-
-        .data-table td {
-            color: var(--fg-bright);
-            font-weight: 700;
-        }
-
-        .category-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 1em;
-        }
-
-        .telemetry-info {
-            color: var(--fg-dim);
-            margin-bottom: 1.5em;
-            font-size: 0.9em;
-        }
-
-        .telemetry-info span {
-            color: var(--fg-bright);
-            font-weight: 700;
-        }
-
-        .batch-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6em;
-        }
-
-        .batch-item {
-            border: 1px solid var(--border);
-            padding: 0.6em 1em;
+        .card-header {
             display: flex;
             justify-content: space-between;
-            align-items: baseline;
-            flex-wrap: wrap;
-            gap: 1em;
-            background-color: var(--bg-card);
+            align-items: center;
+            margin-bottom: 0.75rem;
         }
 
-        .batch-item:hover {
-            background-color: var(--fg);
-            color: var(--bg);
-            border-color: var(--fg);
-        }
-
-        .batch-item:hover a { color: var(--bg); }
-        .batch-item:hover .box-label { color: var(--bg); }
-
-        .batch-time {
+        .card-title {
+            font-size: 1.25rem;
             font-weight: 700;
-            color: var(--fg-bright);
-            letter-spacing: 0.1em;
+            color: var(--fg);
+            margin: 0;
         }
 
-        .batch-item:hover .batch-time { color: var(--bg); }
-
-        .empty {
-            text-align: center;
-            padding: 3em 1em;
-            color: var(--fg-dim);
-            border: 1px dashed var(--fg-dim);
+        .card-meta {
+            color: var(--fg-muted);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
         }
 
-        .empty p {
-            font-style: italic;
-            margin-top: 1em;
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success);
+            display: inline-block;
+            margin-right: 0.5rem;
         }
 
-        .error-box {
-            border: 2px solid var(--fg-bright);
-            padding: 2em;
-            margin-top: 4em;
-            text-align: center;
-            background-color: var(--bg-card);
-        }
-
-        .error-box h1 {
-            font-size: 3em;
-            border: none;
-            margin-bottom: 0.3em;
-            letter-spacing: 0.3em;
-        }
-
-        .error-box p {
-            font-style: italic;
-            color: var(--fg-dim);
-            margin-bottom: 1.5em;
-        }
-
-        .error-box a {
-            font-weight: 700;
+        .status-label {
+            font-size: 0.8rem;
+            color: var(--fg-muted);
             text-transform: uppercase;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.05em;
         }
 
-        .sep {
-            color: var(--fg-dim);
-            letter-spacing: 0.2em;
-            user-select: none;
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
         }
 
-        @media (max-width: 600px) {
-            body { padding: 0.8em; font-size: 13px; }
-            h1 { font-size: 1.2em; }
-            .banner { font-size: 0.7em; }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .meta-row:last-child {
+            border-bottom: none;
+        }
+
+        .meta-label {
+            color: var(--fg-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .meta-value {
+            color: var(--fg);
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        th {
+            color: var(--fg-muted);
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            color: var(--fg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover td {
+            background-color: var(--surface-hover);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--fg-muted);
+        }
+
+        .empty-state p {
+            margin-top: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .error-container {
+            text-align: center;
+            padding: 4rem 2rem;
+            max-width: 500px;
+            margin: 4rem auto;
+        }
+
+        .error-code {
+            font-size: 6rem;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+
+        .error-message {
+            color: var(--fg-muted);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="crt">
+    <div class="container">
         {% block content %}{% endblock %}
     </div>
 </body>
