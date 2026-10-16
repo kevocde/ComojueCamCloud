@@ -44,8 +44,11 @@
 - Interpolación a 20 puntos para mejor resolución visual
 - Escala dinámica del eje Y según datos en ventana
 
-### Giroscopio (Three.js)
-- Visualización 3D con Three.js (bus con carrocería, ventanas, 4 ruedas)
+### Giroscopio (2D)
+- Brújula 2D SVG simple (sin Three.js)
+  - Aguja que rota según heading (yaw del magnetómetro)
+  - Puntos cardinales N/E/S/W
+  - Display de heading con dirección cardinal
 - **Sensor fusion (complementary filter)** combinando:
   - Giroscopio (velocidad angular integrada)
   - Acelerómetro (roll/pitch derivado de gravedad)
@@ -54,17 +57,12 @@
 - **Ajuste de roll**: `pitch_adjusted = 90 - roll_deg` para representar inclinación correcta
   - 0° = nivel, negativo = apunta hacia abajo, positivo = apunta hacia arriba
 - **Indicador de horizonte artificial**:
-  - SVG circular dividido en cielo (azul) y suelo (marrón)
-  - Línea del horizonte con marca central
-  - Rotación basada en pitch_adjusted (clamped a ±45°)
-  - Marca de referencia fija (triángulo) indicando el punto de vista
+  - SVG circular con cielo (azul) y suelo (marrón)
+  - Línea del horizonte SIEMPRE horizontal
+  - Cielo/suelo se desplazan verticalmente según pitch_adjusted (no rota)
+  - Marcas de referencia fijas indicando el punto de vista
   - Display de inclinación en grados debajo del indicador
 - Display de Roll, Pitch, Yaw, Heading en grid responsive
-- **Brújula 3D integrada** en la escena Three.js:
-  - Plataforma circular con anillo exterior
-  - Cono rojo para Norte, cajas grises para S/E/W
-  - Bus rota sobre la plataforma mostrando orientación relativa a cardinales
-- **Corrección landscape**: bus rotado 90° en Y para compensar orientación del celular
 
 ### GPS
 - Coordenadas lat/lon del último batch
